@@ -1,0 +1,67 @@
+package db
+
+import "time"
+
+// Device represents a registered ESP32 device.
+type Device struct {
+	ID         string
+	Name       string
+	TemplateID string
+	FWVersion  string
+	PSK        []byte
+	Status     string
+	LastSeen   *time.Time
+	IP         string
+	CreatedAt  time.Time
+}
+
+// CreateDevice inserts a new device record.
+func (d *Database) CreateDevice(dev Device) error {
+	_, err := d.DB.Exec(
+		`INSERT INTO devices (id, name, template_id, fw_version, psk, status)
+		 VALUES (?, ?, ?, ?, ?, 'unknown')`,
+		dev.ID, dev.Name, dev.TemplateID, dev.FWVersion, dev.PSK)
+	return err
+}
+
+// GetDevice retrieves a device by ID.
+func (d *Database) GetDevice(id string) (Device, error) {
+	row := d.DB.QueryRow(
+		`SELECT id, name, template_id, fw_version, psk, status, last_seen, ip, created_at
+		 FROM devices WHERE id = ?`, id)
+	var dev Device
+	var lastSeen *time.Time
+	err := row.Scan(&dev.ID, &dev.Name, &dev.TemplateID, &dev.FWVersion,
+		&dev.PSK, &dev.Status, &lastSeen, &dev.IP, &dev.CreatedAt)
+	dev.LastSeen = lastSeen
+	return dev, err
+}
+
+// ListDevices returns all devices ordered by name.
+func (d *Database) ListDevices() ([]Device, error) {
+	rows, err := d.DB.Query(
+		`SELECT id, name, template_id, fw_version, psk, status, last_seen, ip, created_at
+		 FROM devices ORDER BY name`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var devs []Device
+	for rows.Next() {
+		var dev Device
+		if err := rows.Scan(&dev.ID, &dev.Name, &dev.TemplateID, &dev.FWVersion,
+			&dev.PSK, &dev.Status, &dev.LastSeen, &dev.IP, &dev.CreatedAt); err != nil {
+			return nil, err
+		}
+		devs = append(devs, dev)
+	}
+	return devs, rows.Err()
+}
+
+// UpdateDeviceStatus updates the status, IP, and last_seen for a device.
+func (d *Database) UpdateDeviceStatus(id, status, ip string) error {
+	_, err := d.DB.Exec(
+		`UPDATE devices SET status = ?, ip = ?, last_seen = CURRENT_TIMESTAMP WHERE id = ?`,
+		status, ip, id)
+	return err
+}

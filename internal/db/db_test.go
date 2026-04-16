@@ -1,0 +1,40 @@
+package db_test
+
+import (
+	"testing"
+
+	"github.com/karthangar/matteresp32hub/internal/db"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestOpen_CreatesTables(t *testing.T) {
+	database, err := db.Open(":memory:")
+	require.NoError(t, err)
+	defer database.Close()
+
+	row := database.DB.QueryRow(
+		"SELECT name FROM sqlite_master WHERE type='table' AND name='devices'")
+	var name string
+	require.NoError(t, row.Scan(&name))
+	assert.Equal(t, "devices", name)
+}
+
+func TestDevice_CreateAndGet(t *testing.T) {
+	database, err := db.Open(":memory:")
+	require.NoError(t, err)
+	defer database.Close()
+
+	dev := db.Device{
+		ID:         "esp-test01",
+		Name:       "1/Bedroom",
+		TemplateID: "firefly-hub-v1",
+		PSK:        []byte("testpsk"),
+	}
+	require.NoError(t, database.CreateDevice(dev))
+
+	got, err := database.GetDevice("esp-test01")
+	require.NoError(t, err)
+	assert.Equal(t, "1/Bedroom", got.Name)
+	assert.Equal(t, []byte("testpsk"), got.PSK)
+}
