@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"time"
 
 	"github.com/karthangar/matteresp32hub/internal/config"
 	"github.com/karthangar/matteresp32hub/internal/db"
@@ -30,12 +31,19 @@ func (s *Server) ListenAndServeTLS() error {
 	if err != nil {
 		return fmt.Errorf("load TLS cert: %w", err)
 	}
-	tlsCfg := &tls.Config{Certificates: []tls.Certificate{cert}}
+	tlsCfg := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		MinVersion:   tls.VersionTLS12,
+	}
 	handler := NewRouter(s.cfg, s.database)
 	srv := &http.Server{
-		Addr:      fmt.Sprintf(":%d", s.cfg.WebPort),
-		Handler:   handler,
-		TLSConfig: tlsCfg,
+		Addr:              fmt.Sprintf(":%d", s.cfg.WebPort),
+		Handler:           handler,
+		TLSConfig:         tlsCfg,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 	return srv.ListenAndServeTLS("", "")
 }
