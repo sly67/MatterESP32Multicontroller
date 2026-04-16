@@ -31,13 +31,15 @@ func Open(path string) (*Database, error) {
 	}
 	sqldb.SetMaxOpenConns(1) // SQLite is single-writer
 
-	if _, err := sqldb.Exec(schema); err != nil {
-		sqldb.Close()
-		return nil, fmt.Errorf("apply schema: %w", err)
-	}
+	// Apply pragmas FIRST (before DDL)
 	if _, err := sqldb.Exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;`); err != nil {
 		sqldb.Close()
 		return nil, fmt.Errorf("apply pragmas: %w", err)
+	}
+	// Then apply schema
+	if _, err := sqldb.Exec(schema); err != nil {
+		sqldb.Close()
+		return nil, fmt.Errorf("apply schema: %w", err)
 	}
 	return &Database{DB: sqldb}, nil
 }

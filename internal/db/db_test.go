@@ -28,6 +28,13 @@ func TestDevice_CreateAndGet(t *testing.T) {
 	require.NoError(t, err)
 	defer database.Close()
 
+	// Insert a template first so the FK constraint on devices.template_id is satisfied.
+	_, err = database.DB.Exec(
+		`INSERT INTO templates (id, name, board, yaml_body) VALUES (?, ?, ?, ?)`,
+		"firefly-hub-v1", "Firefly Hub v1", "esp32-c3", "{}",
+	)
+	require.NoError(t, err)
+
 	dev := db.Device{
 		ID:         "esp-test01",
 		Name:       "1/Bedroom",

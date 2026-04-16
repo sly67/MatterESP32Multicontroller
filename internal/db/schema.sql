@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS devices (
     id          TEXT PRIMARY KEY,
     name        TEXT NOT NULL,
-    template_id TEXT NOT NULL,
+    template_id TEXT NOT NULL REFERENCES templates(id),
     fw_version  TEXT NOT NULL DEFAULT '',
     psk         BLOB NOT NULL,
     status      TEXT NOT NULL DEFAULT 'unknown',

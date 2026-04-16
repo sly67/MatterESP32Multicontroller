@@ -31,6 +31,14 @@ func main() {
 		log.Fatalf("tls: %v", err)
 	}
 
+	// Start placeholder OTA server (full implementation in Plan 4)
+	go func() {
+		otaSrv := api.NewServer(cfg, database, certsDir)
+		if err := otaSrv.ListenAndServeOTA(); err != nil {
+			log.Printf("OTA server: %v", err)
+		}
+	}()
+
 	srv := api.NewServer(cfg, database, certsDir)
 	log.Printf("web UI:  https://0.0.0.0:%d", cfg.WebPort)
 	log.Printf("OTA srv: https://0.0.0.0:%d", cfg.OTAPort)

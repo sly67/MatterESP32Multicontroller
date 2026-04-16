@@ -47,3 +47,32 @@ func (s *Server) ListenAndServeTLS() error {
 	}
 	return srv.ListenAndServeTLS("", "")
 }
+
+// ListenAndServeOTA starts a placeholder HTTPS server on OTAPort.
+// Full OTA handler is implemented in Plan 4.
+func (s *Server) ListenAndServeOTA() error {
+	cert, err := tls.LoadX509KeyPair(
+		filepath.Join(s.certsDir, "server.crt"),
+		filepath.Join(s.certsDir, "server.key"))
+	if err != nil {
+		return fmt.Errorf("load TLS cert: %w", err)
+	}
+	tlsCfg := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		MinVersion:   tls.VersionTLS12,
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "OTA server not yet implemented", http.StatusServiceUnavailable)
+	})
+	srv := &http.Server{
+		Addr:              fmt.Sprintf(":%d", s.cfg.OTAPort),
+		Handler:           mux,
+		TLSConfig:         tlsCfg,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+	return srv.ListenAndServeTLS("", "")
+}
