@@ -29,18 +29,18 @@ const (
 
 // Module is a hardware module definition (e.g. DRV8833, BH1750).
 type Module struct {
-	ID           string                             `yaml:"id"`
-	Name         string                             `yaml:"name"`
-	Version      string                             `yaml:"version"`
-	Category     string                             `yaml:"category"` // driver | sensor | io
-	IO           []IOPin                            `yaml:"io"`
-	Channels     []Channel                          `yaml:"channels,omitempty"`
-	PinGroups    []PinGroup                         `yaml:"pin_groups,omitempty"`
-	TruthTable   map[string]map[string]interface{}  `yaml:"truth_table,omitempty"`
-	PWMModes     map[string]map[string]interface{}  `yaml:"pwm_modes,omitempty"`
-	Capabilities []Capability                       `yaml:"capabilities,omitempty"`
-	Matter       MatterDef                          `yaml:"matter"`
-	Measurement  *Measurement                       `yaml:"measurement,omitempty"`
+	ID           string                            `yaml:"id"`
+	Name         string                            `yaml:"name"`
+	Version      string                            `yaml:"version"`
+	Category     string                            `yaml:"category"` // driver | sensor | io
+	IO           []IOPin                           `yaml:"io"`
+	Channels     []Channel                         `yaml:"channels,omitempty"`
+	PinGroups    []PinGroup                        `yaml:"pin_groups,omitempty"`
+	TruthTable   map[string]map[string]interface{} `yaml:"truth_table,omitempty"`
+	PWMModes     map[string]map[string]interface{} `yaml:"pwm_modes,omitempty"`
+	Capabilities []Capability                      `yaml:"capabilities,omitempty"`
+	Matter       MatterDef                         `yaml:"matter"`
+	Measurement  *Measurement                      `yaml:"measurement,omitempty"`
 }
 
 // IOPin is a single input/output pin declaration within a module.
@@ -72,10 +72,10 @@ type PWMConstraints struct {
 
 // ADCConstraints describes ADC sampling parameters.
 type ADCConstraints struct {
-	Attenuation    string `yaml:"attenuation"`     // 0db | 2.5db | 6db | 11db
+	Attenuation    string `yaml:"attenuation"` // 0db | 2.5db | 6db | 11db
 	ResolutionBits int    `yaml:"resolution_bits"`
 	SampleRateHz   int    `yaml:"sample_rate_hz"`
-	Filter         string `yaml:"filter"`          // none | moving_average | median
+	Filter         string `yaml:"filter"` // none | moving_average | median
 	FilterSamples  int    `yaml:"filter_samples"`
 }
 
