@@ -33,7 +33,10 @@ func generateSelfSigned(crtPath, keyPath string) error {
 	if err != nil {
 		return fmt.Errorf("generate key: %w", err)
 	}
-	serial, _ := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	serial, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	if err != nil {
+		return fmt.Errorf("generate serial: %w", err)
+	}
 	tmpl := &x509.Certificate{
 		SerialNumber: serial,
 		Subject:      pkix.Name{Organization: []string{"MatterESP32Hub"}},
@@ -63,8 +66,14 @@ func writePEM(path, typ string, der []byte) error {
 	if err != nil {
 		return fmt.Errorf("open %s: %w", path, err)
 	}
-	defer f.Close()
-	return pem.Encode(f, &pem.Block{Type: typ, Bytes: der})
+	if err := pem.Encode(f, &pem.Block{Type: typ, Bytes: der}); err != nil {
+		f.Close()
+		return fmt.Errorf("encode PEM %s: %w", path, err)
+	}
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("close %s: %w", path, err)
+	}
+	return nil
 }
 
 func fileExists(path string) bool {
