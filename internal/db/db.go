@@ -35,6 +35,10 @@ func Open(path string) (*Database, error) {
 		sqldb.Close()
 		return nil, fmt.Errorf("apply schema: %w", err)
 	}
+	if _, err := sqldb.Exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;`); err != nil {
+		sqldb.Close()
+		return nil, fmt.Errorf("apply pragmas: %w", err)
+	}
 	return &Database{DB: sqldb}, nil
 }
 

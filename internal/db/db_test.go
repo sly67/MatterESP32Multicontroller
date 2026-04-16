@@ -13,11 +13,14 @@ func TestOpen_CreatesTables(t *testing.T) {
 	require.NoError(t, err)
 	defer database.Close()
 
-	row := database.DB.QueryRow(
-		"SELECT name FROM sqlite_master WHERE type='table' AND name='devices'")
-	var name string
-	require.NoError(t, row.Scan(&name))
-	assert.Equal(t, "devices", name)
+	expected := []string{"devices", "templates", "modules", "effects", "firmware", "flash_log", "ota_log"}
+	for _, tbl := range expected {
+		row := database.DB.QueryRow(
+			"SELECT name FROM sqlite_master WHERE type='table' AND name=?", tbl)
+		var name string
+		require.NoError(t, row.Scan(&name), "table %q missing", tbl)
+		assert.Equal(t, tbl, name)
+	}
 }
 
 func TestDevice_CreateAndGet(t *testing.T) {

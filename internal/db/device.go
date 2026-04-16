@@ -31,10 +31,12 @@ func (d *Database) GetDevice(id string) (Device, error) {
 		 FROM devices WHERE id = ?`, id)
 	var dev Device
 	var lastSeen *time.Time
-	err := row.Scan(&dev.ID, &dev.Name, &dev.TemplateID, &dev.FWVersion,
-		&dev.PSK, &dev.Status, &lastSeen, &dev.IP, &dev.CreatedAt)
+	if err := row.Scan(&dev.ID, &dev.Name, &dev.TemplateID, &dev.FWVersion,
+		&dev.PSK, &dev.Status, &lastSeen, &dev.IP, &dev.CreatedAt); err != nil {
+		return Device{}, err
+	}
 	dev.LastSeen = lastSeen
-	return dev, err
+	return dev, nil
 }
 
 // ListDevices returns all devices ordered by name.
@@ -49,10 +51,12 @@ func (d *Database) ListDevices() ([]Device, error) {
 	var devs []Device
 	for rows.Next() {
 		var dev Device
+		var lastSeen *time.Time
 		if err := rows.Scan(&dev.ID, &dev.Name, &dev.TemplateID, &dev.FWVersion,
-			&dev.PSK, &dev.Status, &dev.LastSeen, &dev.IP, &dev.CreatedAt); err != nil {
+			&dev.PSK, &dev.Status, &lastSeen, &dev.IP, &dev.CreatedAt); err != nil {
 			return nil, err
 		}
+		dev.LastSeen = lastSeen
 		devs = append(devs, dev)
 	}
 	return devs, rows.Err()
