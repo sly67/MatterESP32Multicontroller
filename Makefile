@@ -1,4 +1,4 @@
-.PHONY: build web test docker
+.PHONY: build web test docker run lint
 
 web:
 	cd web && npm install && npm run build
