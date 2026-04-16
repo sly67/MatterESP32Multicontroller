@@ -1,0 +1,20 @@
+services:
+  matteresp32hub:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "48060:48060"
+      - "48061:48061"
+    volumes:
+      - /Portainer/MatterESP32/db:/data/db
+      - /Portainer/MatterESP32/firmware:/data/firmware
+      - /Portainer/MatterESP32/modules:/data/modules
+      - /Portainer/MatterESP32/templates:/data/templates
+      - /Portainer/MatterESP32/config:/data/config
+      - /Portainer/MatterESP32/logs:/data/logs
+      - /Portainer/MatterESP32/certs:/data/certs
+      - /Portainer/MatterESP32/matter:/data/matter
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0
+    environment:
+      - DATA_DIR=/data
