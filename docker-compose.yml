@@ -15,7 +15,7 @@ services:
       - /Portainer/MatterESP32/logs:/data/logs
       - /Portainer/MatterESP32/certs:/data/certs
       - /Portainer/MatterESP32/matter:/data/matter
-    devices:
-      - /dev/ttyUSB0:/dev/ttyUSB0
+    # devices:           # uncomment and add USB ports when flashing devices
+    #   - /dev/ttyUSB0:/dev/ttyUSB0
     environment:
       - DATA_DIR=/data
