@@ -1,6 +1,7 @@
 services:
   matteresp32hub:
     build: .
+    image: matteresp32hub:latest
     restart: unless-stopped
     ports:
       - "48060:48060"
