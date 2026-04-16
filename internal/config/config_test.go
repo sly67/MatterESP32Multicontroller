@@ -21,8 +21,8 @@ func TestLoad_WritesDefaultsOnFirstBoot(t *testing.T) {
 
 func TestLoad_ReadsExistingConfig(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "app.yaml"),
-		[]byte("web_port: 9000\nota_port: 9001\n"), 0644)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "app.yaml"),
+		[]byte("web_port: 9000\nota_port: 9001\n"), 0644))
 	cfg, err := config.Load(dir)
 	require.NoError(t, err)
 	assert.Equal(t, 9000, cfg.WebPort)

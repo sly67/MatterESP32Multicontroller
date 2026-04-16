@@ -44,16 +44,24 @@ func Load(dir string) (*Config, error) {
 }
 
 func loadOrWrite[T any](path string, def T) (T, error) {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		data, err := yaml.Marshal(def)
-		if err != nil {
-			return def, fmt.Errorf("marshal default %s: %w", path, err)
+	// Try to create the file exclusively — atomic first-boot write
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+	if err == nil {
+		// File did not exist — write defaults
+		defer f.Close()
+		data, merr := yaml.Marshal(def)
+		if merr != nil {
+			return def, fmt.Errorf("marshal default %s: %w", path, merr)
 		}
-		if err := os.WriteFile(path, data, 0644); err != nil {
-			return def, fmt.Errorf("write default %s: %w", path, err)
+		if _, werr := f.Write(data); werr != nil {
+			return def, fmt.Errorf("write default %s: %w", path, werr)
 		}
 		return def, nil
 	}
+	if !os.IsExist(err) {
+		return def, fmt.Errorf("open %s: %w", path, err)
+	}
+	// File already exists — read it
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return def, fmt.Errorf("read %s: %w", path, err)
