@@ -15,7 +15,12 @@ services:
       - /Portainer/MatterESP32/logs:/data/logs
       - /Portainer/MatterESP32/certs:/data/certs
       - /Portainer/MatterESP32/matter:/data/matter
-    # devices:           # uncomment and add USB ports when flashing devices
+    # Uncomment the USB devices you have connected before flashing.
+    # Docker requires the device to exist on the host at container start.
+    # devices:
     #   - /dev/ttyUSB0:/dev/ttyUSB0
+    #   - /dev/ttyUSB1:/dev/ttyUSB1
+    #   - /dev/ttyACM0:/dev/ttyACM0
+    #   - /dev/ttyACM1:/dev/ttyACM1
     environment:
       - DATA_DIR=/data

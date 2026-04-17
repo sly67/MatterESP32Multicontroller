@@ -22,6 +22,7 @@ func NewRouter(cfg *config.Config, database *db.Database) http.Handler {
 	r.Route("/api/modules", modulesRouter(database))
 	r.Route("/api/effects", effectsRouter(database))
 	r.Route("/api/firmware", firmwareRouter(database))
+	r.Route("/api/flash", flashRouter(database))
 	r.Route("/api/settings", settingsRouter(cfg, database))
 
 	// Frontend — served from embedded FS (wired in Task 7)

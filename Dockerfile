@@ -21,7 +21,7 @@ FROM alpine:3.19
 # esptool installed via pip (not apk) to get a current release.
 # --break-system-packages is required on Alpine's managed Python.
 RUN apk add --no-cache ca-certificates python3 py3-pip && \
-    pip3 install "esptool==4.8.1" --break-system-packages
+    pip3 install "esptool==4.8.1" "esp-idf-nvs-partition-gen==0.1.5" --break-system-packages
 WORKDIR /app
 COPY --from=go-builder /app/bin/server .
 COPY data/ ./data/
