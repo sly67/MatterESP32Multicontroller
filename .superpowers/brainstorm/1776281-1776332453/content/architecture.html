@@ -1,0 +1,90 @@
+<h2>System Architecture Overview</h2>
+<p class="subtitle">MatterESP32Multicontroller — how the pieces fit together</p>
+
+<div style="font-family: monospace; font-size: 13px; line-height: 1.6; background: #111; color: #e0e0e0; border-radius: 12px; padding: 28px 32px; margin: 16px 0;">
+
+  <div style="display: flex; gap: 32px; align-items: flex-start; flex-wrap: wrap;">
+
+    <!-- Left: RPi + Docker -->
+    <div style="flex: 1; min-width: 260px;">
+      <div style="border: 2px solid #6366f1; border-radius: 10px; padding: 16px; background: #1a1a2e;">
+        <div style="color: #a5b4fc; font-weight: bold; font-size: 14px; margin-bottom: 12px;">🖥️ Raspberry Pi (Docker)</div>
+
+        <div style="border: 1px solid #4f46e5; border-radius: 8px; padding: 12px; background: #12122a; margin-bottom: 10px;">
+          <div style="color: #818cf8; font-size: 12px; margin-bottom: 6px;">Go Backend</div>
+          <div style="color: #cbd5e1; font-size: 11px; line-height: 1.8;">
+            ├─ USB Serial Manager<br>
+            ├─ esptool Flash Runner<br>
+            ├─ Config Push (NVS)<br>
+            ├─ PSK Generator<br>
+            ├─ OTA HTTP Server<br>
+            ├─ Device Registry (SQLite)<br>
+            └─ REST API
+          </div>
+        </div>
+
+        <div style="border: 1px solid #4f46e5; border-radius: 8px; padding: 12px; background: #12122a;">
+          <div style="color: #818cf8; font-size: 12px; margin-bottom: 6px;">Svelte + DaisyUI Frontend</div>
+          <div style="color: #cbd5e1; font-size: 11px; line-height: 1.8;">
+            ├─ Flash Wizard<br>
+            ├─ Hardware Config Builder<br>
+            ├─ Fleet Dashboard (50 devices)<br>
+            └─ OTA Update Manager
+          </div>
+        </div>
+
+        <div style="margin-top: 12px; color: #4ade80; font-size: 11px; text-align: center;">
+          SQLite · Pre-built firmware bundle
+        </div>
+      </div>
+    </div>
+
+    <!-- Middle: USB + WiFi arrows -->
+    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding-top: 60px; min-width: 100px;">
+      <div style="text-align: center;">
+        <div style="color: #f59e0b; font-size: 11px; margin-bottom: 4px;">USB (×4)</div>
+        <div style="color: #fbbf24; font-size: 22px;">⟺</div>
+        <div style="color: #94a3b8; font-size: 10px;">flash + config</div>
+      </div>
+      <div style="text-align: center;">
+        <div style="color: #34d399; font-size: 11px; margin-bottom: 4px;">WiFi OTA</div>
+        <div style="color: #6ee7b7; font-size: 22px;">⟺</div>
+        <div style="color: #94a3b8; font-size: 10px;">PSK-auth HTTP</div>
+      </div>
+    </div>
+
+    <!-- Right: ESP32 devices -->
+    <div style="flex: 1; min-width: 260px; display: flex; flex-direction: column; gap: 12px;">
+
+      <div style="border: 2px solid #f59e0b; border-radius: 10px; padding: 14px; background: #1c1a0a;">
+        <div style="color: #fcd34d; font-weight: bold; font-size: 13px; margin-bottom: 8px;">⚡ ESP32-C3 (Universal Firmware)</div>
+        <div style="color: #cbd5e1; font-size: 11px; line-height: 1.8;">
+          Matter Bridge device<br>
+          ├─ Endpoint 1: Firefly LEDs (DRV8833)<br>
+          ├─ Endpoint 2: WRGB Light Controller<br>
+          ├─ Endpoint 3: Light Sensor (I2C)<br>
+          ├─ Endpoint N: Analog IN/OUT<br>
+          └─ NVS config store · OTA client
+        </div>
+        <div style="margin-top: 8px; color: #f59e0b; font-size: 10px;">Config: hardware map · PSK · WiFi creds · Matter PAI</div>
+      </div>
+
+      <div style="color: #64748b; font-size: 11px; text-align: center;">× up to 50 deployed devices</div>
+
+      <div style="border: 1px dashed #475569; border-radius: 8px; padding: 10px; background: #0f172a; text-align: center;">
+        <div style="color: #94a3b8; font-size: 11px;">Matter Network</div>
+        <div style="color: #64748b; font-size: 10px; margin-top: 4px;">Home Assistant · Apple Home · Google Home</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="margin-top: 20px; border-top: 1px solid #1e293b; padding-top: 14px; display: flex; gap: 20px; flex-wrap: wrap;">
+    <span style="color: #6366f1; font-size: 11px;">● Initial flash: USB serial (esptool)</span>
+    <span style="color: #34d399; font-size: 11px;">● Config push: USB serial (custom protocol)</span>
+    <span style="color: #f59e0b; font-size: 11px;">● Updates: OTA over WiFi (PSK-authenticated)</span>
+    <span style="color: #f87171; font-size: 11px;">● Security: PSK embedded at flash time</span>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top: 16px;">Does this architecture match your vision? Let me know what to adjust.</p>

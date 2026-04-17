@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="night">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MatterESP32 Manager</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  html,body{height:100%;margin:0;overflow:hidden}
+  body{display:flex;flex-direction:column}
+  #app{display:flex;height:100vh;width:100vw;overflow:hidden}
+  .sidebar{width:220px;flex-shrink:0;display:flex;flex-direction:column}
+  .main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+  .view{display:none;flex:1;overflow-y:auto;padding:1.25rem 1.5rem;flex-direction:column;gap:1rem}
+  .view.active{display:flex}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:13px;color:#a6adbb;transition:all .15s;margin:1px 0}
+  .nav-item:hover{background:rgba(255,255,255,.05);color:#fff}
+  .nav-item.active{background:oklch(var(--p)/.15);color:oklch(var(--p));font-weight:600}
+  .nav-section{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#64748b;padding:12px 12px 4px}
+  .sdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;display:inline-block}
+  .dot-on{background:#4ade80;box-shadow:0 0 4px #4ade80}
+  .dot-off{background:#64748b}
+  .dot-upd{background:#fbbf24;animation:pulse 1s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Sidebar -->
+  <div class="sidebar bg-base-300 border-r border-base-200 p-3">
+    <div class="flex items-center gap-2 px-2 py-3 mb-2 border-b border-base-200">
+      <span class="text-lg">&#9889;</span>
+      <div>
+        <div class="font-bold text-sm text-white">MatterESP32</div>
+        <div class="text-xs text-base-content/40">Manager v1.0</div>
+      </div>
+    </div>
+    <div class="nav-section">Overview</div>
+    <div class="nav-item active" onclick="showView('fleet')"><span>&#9783;</span> Fleet <span class="ml-auto badge badge-xs badge-success">47 online</span></div>
+    <div class="nav-item" onclick="showView('flash')"><span>&#9889;</span> Flash Devices</div>
+    <div class="nav-section">Configuration</div>
+    <div class="nav-item" onclick="showView('templates')"><span>&#9881;</span> Templates</div>
+    <div class="nav-item" onclick="showView('modules')"><span>&#9965;</span> Module Library</div>
+    <div class="nav-section">Updates</div>
+    <div class="nav-item" onclick="showView('ota')"><span>&#8645;</span> OTA Updates <span class="ml-auto badge badge-xs badge-warning">3</span></div>
+    <div class="nav-item" onclick="showView('firmware')"><span>&#128190;</span> Firmware</div>
+    <div class="nav-section">System</div>
+    <div class="nav-item" onclick="showView('settings')"><span>&#9965;</span> Settings</div>
+    <div class="mt-auto pt-3 border-t border-base-200 px-2">
+      <div class="text-xs text-base-content/30">OTA server: <span class="text-success">running</span></div>
+      <div class="text-xs text-base-content/30 mt-1">USB: 1 port active</div>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="navbar bg-base-200 border-b border-base-200 px-4 min-h-12 flex-shrink-0">
+      <div class="navbar-start"><span class="font-semibold text-sm" id="view-title">Fleet Dashboard</span></div>
+      <div class="navbar-end gap-2">
+        <button class="btn btn-xs btn-outline" onclick="showView('flash')">+ Flash New Device</button>
+      </div>
+    </div>
+
+    <!-- FLEET -->
+    <div class="view active" id="view-fleet">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="stat bg-base-200 rounded-box p-4"><div class="stat-title text-xs">Total devices</div><div class="stat-value text-2xl">52</div><div class="stat-desc text-xs">all templates</div></div>
+        <div class="stat bg-base-200 rounded-box p-4"><div class="stat-title text-xs">Online</div><div class="stat-value text-2xl text-success">47</div><div class="stat-desc text-xs">5 offline</div></div>
+        <div class="stat bg-base-200 rounded-box p-4"><div class="stat-title text-xs">Pending OTA</div><div class="stat-value text-2xl text-warning">3</div><div class="stat-desc text-xs">awaiting update</div></div>
+        <div class="stat bg-base-200 rounded-box p-4"><div class="stat-title text-xs">FW versions</div><div class="stat-value text-2xl">2</div><div class="stat-desc text-xs">v1.0.0 / v1.1.0</div></div>
+      </div>
+      <div class="card bg-base-200 border border-base-300 flex-1">
+        <div class="card-body p-4">
+          <div class="flex gap-2 mb-3 flex-wrap">
+            <input class="input input-sm input-bordered w-44" placeholder="Search name or ID...">
+            <select class="select select-sm select-bordered"><option>All templates</option><option>firefly-hub-v1</option><option>sensor-only-v1</option></select>
+            <select class="select select-sm select-bordered"><option>All status</option><option>Online</option><option>Offline</option></select>
+            <select class="select select-sm select-bordered"><option>All firmware</option><option>v1.0.0</option><option>v1.1.0</option></select>
+            <button class="btn btn-sm btn-warning ml-auto" onclick="showView('ota')">Update outdated (3)</button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="table table-xs table-zebra w-full">
+              <thead><tr><th><input type="checkbox" class="checkbox checkbox-xs"></th><th>Name</th><th>ID</th><th>Template</th><th>Firmware</th><th>Status</th><th>Last seen</th><th>IP</th><th></th></tr></thead>
+              <tbody id="fleet-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FLASH -->
+    <div class="view" id="view-flash">
+      <h2 class="text-base font-semibold">Flash Devices</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="card bg-base-200 border border-base-300"><div class="card-body p-4">
+          <h4 class="font-semibold text-sm mb-3">1. Select template</h4>
+          <select class="select select-sm select-bordered w-full mb-2"><option>firefly-hub-v1 (ESP32-C3)</option><option>sensor-only-v1 (ESP32-C3)</option></select>
+          <div class="text-xs text-base-content/40">4 modules · 4 Matter endpoints · v1.1.0</div>
+        </div></div>
+        <div class="card bg-base-200 border border-base-300"><div class="card-body p-4">
+          <h4 class="font-semibold text-sm mb-3">2. Device naming</h4>
+          <div class="flex flex-col gap-2" id="flash-names"></div>
+          <button class="btn btn-outline btn-xs mt-2 w-full" onclick="addFlashRow()">+ Add slot</button>
+        </div></div>
+        <div class="card bg-base-200 border border-base-300"><div class="card-body p-4">
+          <h4 class="font-semibold text-sm mb-3">3. WiFi credentials</h4>
+          <label class="label-text text-xs">SSID</label>
+          <input class="input input-sm input-bordered w-full mt-1 mb-2" placeholder="MyNetwork">
+          <label class="label-text text-xs">Password</label>
+          <input type="password" class="input input-sm input-bordered w-full mt-1">
+        </div></div>
+        <div class="card bg-base-200 border border-base-300"><div class="card-body p-4">
+          <h4 class="font-semibold text-sm mb-3">4. Security</h4>
+          <div class="grid grid-cols-2 gap-1 text-xs">
+            <span class="text-base-content/50">PSK</span><span class="text-success">Auto per device</span>
+            <span class="text-base-content/50">OTA auth</span><span>HMAC-SHA256</span>
+            <span class="text-base-content/50">Firmware</span><span class="font-mono">v1.1.0</span>
+          </div>
+        </div></div>
+        <div class="card bg-base-200 border border-success/40 md:col-span-2"><div class="card-body p-4 flex-row items-center justify-between gap-4 flex-wrap">
+          <div>
+            <div class="font-semibold text-sm">Ready — 1 device connected</div>
+            <div class="text-xs text-base-content/40 mt-1">Flashes firmware then pushes NVS config. PSK stored in registry.</div>
+          </div>
+          <div class="flex gap-2">
+            <button class="btn btn-success btn-sm">Flash + Push Config</button>
+            <button class="btn btn-outline btn-sm">Dry run</button>
+          </div>
+        </div></div>
+      </div>
+    </div>
+
+    <!-- TEMPLATES -->
+    <div class="view" id="view-templates">
+      <div class="flex items-center justify-between">
+        <h2 class="text-base font-semibold">Templates</h2>
+        <div class="flex gap-2">
+          <button class="btn btn-sm btn-outline">Import .yaml</button>
+          <button class="btn btn-sm btn-primary">+ New template</button>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div class="card bg-base-200 border border-primary/30"><div class="card-body p-4">
+          <div class="flex justify-between items-start">
+            <div><h4 class="font-semibold text-sm">firefly-hub-v1</h4><div class="text-xs text-base-content/40 mt-1">ESP32-C3 · 4 modules · 4 endpoints</div></div>
+            <span class="badge badge-xs badge-primary">default</span>
+          </div>
+          <div class="flex flex-wrap gap-1 mt-2">
+            <span class="badge badge-xs badge-secondary">DRV8833</span>
+            <span class="badge badge-xs badge-secondary">WRGB</span>
+            <span class="badge badge-xs badge-accent">BH1750</span>
+            <span class="badge badge-xs badge-warning">ADC</span>
+          </div>
+          <div class="text-xs text-base-content/30 mt-2">Used by 38 devices</div>
+          <div class="card-actions mt-3 gap-2">
+            <button class="btn btn-xs btn-outline flex-1">Edit</button>
+            <button class="btn btn-xs btn-outline flex-1">Export</button>
+            <button class="btn btn-xs btn-ghost">Clone</button>
+          </div>
+        </div></div>
+        <div class="card bg-base-200 border border-base-300"><div class="card-body p-4">
+          <div><h4 class="font-semibold text-sm">sensor-only-v1</h4><div class="text-xs text-base-content/40 mt-1">ESP32-C3 · 2 modules · 2 endpoints</div></div>
+          <div class="flex flex-wrap gap-1 mt-2">
+            <span class="badge badge-xs badge-accent">BH1750</span>
+            <span class="badge badge-xs badge-warning">ADC</span>
+          </div>
+          <div class="text-xs text-base-content/30 mt-2">Used by 9 devices</div>
+          <div class="card-actions mt-3 gap-2">
+            <button class="btn btn-xs btn-outline flex-1">Edit</button>
+            <button class="btn btn-xs btn-outline flex-1">Export</button>
+            <button class="btn btn-xs btn-ghost">Clone</button>
+          </div>
+        </div></div>
+        <div class="card bg-base-200 border border-dashed border-base-300 cursor-pointer"><div class="card-body p-4 items-center justify-center text-center min-h-32">
+          <span class="text-2xl text-base-content/30">+</span>
+          <p class="text-xs text-base-content/40 mt-2">New template</p>
+        </div></div>
+      </div>
+    </div>
+
+    <!-- MODULE LIBRARY -->
+    <div class="view" id="view-modules">
+      <div class="flex items-center justify-between">
+        <h2 class="text-base font-semibold">Module Library</h2>
+        <div class="flex gap-2">
+          <button class="btn btn-sm btn-outline">Import .yaml</button>
+          <button class="btn btn-sm btn-primary">+ New module</button>
+        </div>
+      </div>
+      <div class="tabs tabs-boxed bg-base-300 w-fit">
+        <a class="tab tab-active tab-sm text-xs" onclick="filterMods('all',this)">All</a>
+        <a class="tab tab-sm text-xs" onclick="filterMods('driver',this)">Drivers</a>
+        <a class="tab tab-sm text-xs" onclick="filterMods('sensor',this)">Sensors</a>
+        <a class="tab tab-sm text-xs" onclick="filterMods('io',this)">I/O</a>
+        <a class="tab tab-sm text-xs" onclick="filterMods('custom',this)">Custom</a>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3" id="mod-grid">
+        <div class="card bg-base-200 border border-base-300" data-cat="driver"><div class="card-body p-4">
+          <h4 class="font-semibold text-sm">DRV8833</h4>
+          <p class="text-xs text-base-content/50 mt-1">Dual H-bridge driver. Bidirectional LED control.</p>
+          <div class="flex flex-wrap gap-1 mt-2"><span class="badge badge-xs badge-secondary">4x PWM</span><span class="badge badge-xs">driver</span></div>
+          <div class="text-xs text-base-content/30 mt-2">Built-in · 2 templates</div>
+          <div class="card-actions mt-2 gap-1"><button class="btn btn-xs btn-outline">View YAML</button><button class="btn btn-xs btn-ghost">Export</button></div>
+        </div></div>
+        <div class="card bg-base-200 border border-base-300" data-cat="driver"><div class="card-body p-4">
+          <h4 class="font-semibold text-sm">WRGB LED</h4>
+          <p class="text-xs text-base-content/50 mt-1">4-channel PWM LED controller.</p>
+          <div class="flex flex-wrap gap-1 mt-2"><span class="badge badge-xs badge-secondary">4x PWM</span><span class="badge badge-xs">light</span></div>
+          <div class="text-xs text-base-content/30 mt-2">Built-in · 2 templates</div>
+          <div class="card-actions mt-2 gap-1"><button class="btn btn-xs btn-outline">View YAML</button><button class="btn btn-xs btn-ghost">Export</button></div>
+        </div></div>
+        <div class="card bg-base-200 border border-base-300" data-cat="sensor"><div class="card-body p-4">
+          <h4 class="font-semibold text-sm">BH1750</h4>
+          <p class="text-xs text-base-content/50 mt-1">Ambient light sensor I2C. 1-65535 lux.</p>
+          <div class="flex flex-wrap gap-1 mt-2"><span class="badge badge-xs badge-accent">I2C</span><span class="badge badge-xs">sensor</span></div>
+          <div class="text-xs text-base-content/30 mt-2">Built-in · 2 templates</div>
+          <div class="card-actions mt-2 gap-1"><button class="btn btn-xs btn-outline">View YAML</button><button class="btn btn-xs btn-ghost">Export</button></div>
+        </div></div>
+        <div class="card bg-base-200 border border-base-300" data-cat="sensor"><div class="card-body p-4">
+          <h4 class="font-semibold text-sm">VEML7700</h4>
+          <p class="text-xs text-base-content/50 mt-1">High dynamic range lux sensor I2C.</p>
+          <div class="flex flex-wrap gap-1 mt-2"><span class="badge badge-xs badge-accent">I2C</span><span class="badge badge-xs">sensor</span></div>
+          <div class="text-xs text-base-content/30 mt-2">Built-in · unused</div>
+          <div class="card-actions mt-2 gap-1"><button class="btn btn-xs btn-outline">View YAML</button><button class="btn btn-xs btn-ghost">Export</button></div>
+        </div></div>
+        <div class="card bg-base-200 border border-base-300" data-cat="io"><div class="card-body p-4">
+          <h4 class="font-semibold text-sm">Analog IN</h4>
+          <p class="text-xs text-base-content/50 mt-1">Generic ADC input, configurable scale.</p>
+          <div class="flex flex-wrap gap-1 mt-2"><span class="badge badge-xs badge-warning">ADC</span><span class="badge badge-xs">input</span></div>
+          <div class="text-xs text-base-content/30 mt-2">Built-in · 2 templates</div>
+          <div class="card-actions mt-2 gap-1"><button class="btn btn-xs btn-outline">View YAML</button><button class="btn btn-xs btn-ghost">Export</button></div>
+        </div></div>
+        <div class="card bg-base-200 border border-base-300" data-cat="io"><div class="card-body p-4">
+          <h4 class="font-semibold text-sm">GPIO Switch</h4>
+          <p class="text-xs text-base-content/50 mt-1">Digital on/off. Maps to Matter On/Off cluster.</p>
+          <div class="flex flex-wrap gap-1 mt-2"><span class="badge badge-xs">digital</span><span class="badge badge-xs">output</span></div>
+          <div class="text-xs text-base-content/30 mt-2">Built-in · unused</div>
+          <div class="card-actions mt-2 gap-1"><button class="btn btn-xs btn-outline">View YAML</button><button class="btn btn-xs btn-ghost">Export</button></div>
+        </div></div>
+        <div class="card bg-base-200 border border-dashed border-base-300 cursor-pointer" data-cat="custom"><div class="card-body p-4 items-center justify-center text-center min-h-32">
+          <span class="text-2xl text-base-content/30">+</span>
+          <p class="text-xs text-base-content/40 mt-2">New custom module</p>
+        </div></div>
+      </div>
+    </div>
+
+    <!-- OTA -->
+    <div class="view" id="view-ota">
+      <div class="flex items-center justify-between">
+        <h2 class="text-base font-semibold">OTA Updates</h2>
+        <button class="btn btn-sm btn-warning">Push to all outdated (3)</button>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div class="stat bg-base-200 rounded-box p-4"><div class="stat-title text-xs">Up to date</div><div class="stat-value text-2xl text-success">49</div><div class="stat-desc text-xs">on v1.1.0</div></div>
+        <div class="stat bg-base-200 rounded-box p-4"><div class="stat-title text-xs">Outdated</div><div class="stat-value text-2xl text-warning">3</div><div class="stat-desc text-xs">on v1.0.0</div></div>
+        <div class="stat bg-base-200 rounded-box p-4"><div class="stat-title text-xs">Offline</div><div class="stat-value text-2xl">5</div><div class="stat-desc text-xs">updates on reconnect</div></div>
+      </div>
+      <div class="card bg-base-200 border border-warning/30"><div class="card-body p-4">
+        <h4 class="font-semibold text-sm mb-3">Pending update</h4>
+        <table class="table table-xs w-full">
+          <thead><tr><th><input type="checkbox" class="checkbox checkbox-xs"></th><th>Name</th><th>Current</th><th>Target</th><th>Status</th><th></th></tr></thead>
+          <tbody id="ota-tbody"></tbody>
+        </table>
+      </div></div>
+      <div class="card bg-base-200 border border-base-300"><div class="card-body p-4">
+        <h4 class="font-semibold text-sm mb-3">Auto-update settings</h4>
+        <div class="flex gap-6 items-center flex-wrap text-sm">
+          <label class="flex items-center gap-2"><input type="checkbox" class="toggle toggle-sm toggle-success" checked> Auto-update online devices</label>
+          <label class="flex items-center gap-2"><input type="checkbox" class="toggle toggle-sm" checked> Notify before pushing</label>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- FIRMWARE -->
+    <div class="view" id="view-firmware">
+      <div class="flex items-center justify-between">
+        <h2 class="text-base font-semibold">Firmware Versions</h2>
+        <button class="btn btn-sm btn-outline">Upload firmware binary</button>
+      </div>
+      <div class="card bg-base-200 border border-base-300"><div class="card-body p-4">
+        <table class="table table-xs w-full">
+          <thead><tr><th>Version</th><th>Uploaded</th><th>Target boards</th><th>Devices</th><th>Notes</th><th></th></tr></thead>
+          <tbody id="fw-tbody"></tbody>
+        </table>
+      </div></div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="view" id="view-settings">
+      <h2 class="text-base font-semibold">Settings</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="card bg-base-200 border border-base-300"><div class="card-body p-4">
+          <h4 class="font-semibold text-sm mb-3">USB ports</h4>
+          <div class="flex gap-2 items-center mb-3">
+            <span class="badge badge-success font-mono text-xs">/dev/ttyUSB0</span>
+            <span class="text-success text-xs">active</span>
+            <button class="btn btn-xs btn-ghost text-error ml-auto">Remove</button>
+          </div>
+          <button class="btn btn-outline btn-xs">+ Add USB port</button>
+        </div></div>
+        <div class="card bg-base-200 border border-base-300"><div class="card-body p-4">
+          <h4 class="font-semibold text-sm mb-3">OTA server</h4>
+          <div class="grid grid-cols-2 gap-1 text-xs">
+            <span class="text-base-content/50">Status</span><span class="text-success">Running</span>
+            <span class="text-base-content/50">Port</span><span class="font-mono">8080</span>
+            <span class="text-base-content/50">Auth</span><span>PSK HMAC-SHA256</span>
+          </div>
+        </div></div>
+        <div class="card bg-base-200 border border-base-300"><div class="card-body p-4">
+          <h4 class="font-semibold text-sm mb-3">Default WiFi credentials</h4>
+          <label class="label-text text-xs">SSID</label>
+          <input class="input input-sm input-bordered w-full mt-1 mb-2" placeholder="MyNetwork">
+          <label class="label-text text-xs">Password</label>
+          <input type="password" class="input input-sm input-bordered w-full mt-1">
+          <button class="btn btn-sm btn-outline mt-3">Save</button>
+        </div></div>
+        <div class="card bg-base-200 border border-base-300"><div class="card-body p-4">
+          <h4 class="font-semibold text-sm mb-3">Database</h4>
+          <div class="grid grid-cols-2 gap-1 text-xs">
+            <span class="text-base-content/50">Engine</span><span>SQLite</span>
+            <span class="text-base-content/50">Devices</span><span>52</span>
+            <span class="text-base-content/50">Templates</span><span>2</span>
+            <span class="text-base-content/50">Modules</span><span>7</span>
+          </div>
+          <button class="btn btn-xs btn-outline mt-3">Export backup</button>
+        </div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+var viewTitles = {fleet:'Fleet Dashboard',flash:'Flash Devices',templates:'Templates',modules:'Module Library',ota:'OTA Updates',firmware:'Firmware',settings:'Settings'};
+
+function showView(id) {
+  document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active');});
+  var el=document.getElementById('view-'+id);
+  if(el) el.classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(function(n){
+    n.classList.toggle('active', (n.getAttribute('onclick')||'').indexOf("'"+id+"'")!==-1);
+  });
+  var t=document.getElementById('view-title');
+  if(t) t.textContent=viewTitles[id]||id;
+}
+
+// Fleet table — safe DOM construction
+var fleetData=[
+  {name:'1/Bedroom',   id:'esp-a1b2',tmpl:'firefly-hub-v1', fw:'v1.1.0',status:'online',   seen:'2s ago',  ip:'192.168.1.101'},
+  {name:'2/Attic',     id:'esp-c3d4',tmpl:'firefly-hub-v1', fw:'v1.1.0',status:'online',   seen:'5s ago',  ip:'192.168.1.102'},
+  {name:'3/Cupboard',  id:'esp-e5f6',tmpl:'firefly-hub-v1', fw:'v1.0.0',status:'online',   seen:'12s ago', ip:'192.168.1.103'},
+  {name:'4/Kitchen',   id:'esp-g7h8',tmpl:'sensor-only-v1', fw:'v1.1.0',status:'online',   seen:'1m ago',  ip:'192.168.1.104'},
+  {name:'5/Hallway',   id:'esp-i9j0',tmpl:'firefly-hub-v1', fw:'v1.1.0',status:'offline',  seen:'2h ago',  ip:'--'},
+  {name:'6/LivingRoom',id:'esp-k1l2',tmpl:'firefly-hub-v1', fw:'v1.1.0',status:'online',   seen:'3s ago',  ip:'192.168.1.106'},
+  {name:'7/Garage',    id:'esp-m3n4',tmpl:'sensor-only-v1', fw:'v1.0.0',status:'updating', seen:'now',     ip:'192.168.1.107'},
+  {name:'8/Garden',    id:'esp-o5p6',tmpl:'firefly-hub-v1', fw:'v1.1.0',status:'online',   seen:'7s ago',  ip:'192.168.1.108'},
+];
+
+function mkTd(txt,extra){var td=document.createElement('td');if(extra) td.className=extra;td.textContent=txt;return td;}
+function mkBadge(txt,cls){var s=document.createElement('span');s.className='badge badge-xs '+(cls||'');s.textContent=txt;return s;}
+
+function buildFleet(){
+  var tbody=document.getElementById('fleet-tbody');
+  fleetData.forEach(function(d){
+    var tr=document.createElement('tr');
+    // checkbox
+    var tdCb=document.createElement('td');var cb=document.createElement('input');cb.type='checkbox';cb.className='checkbox checkbox-xs';tdCb.appendChild(cb);tr.appendChild(tdCb);
+    // name
+    tr.appendChild(mkTd(d.name,'font-mono text-xs'));
+    // id
+    tr.appendChild(mkTd(d.id,'font-mono text-xs text-base-content/40'));
+    // template
+    tr.appendChild(mkTd(d.tmpl,'text-xs'));
+    // firmware badge
+    var tdFw=document.createElement('td');tdFw.appendChild(mkBadge(d.fw,d.fw==='v1.0.0'?'badge-warning':'badge-success'));tr.appendChild(tdFw);
+    // status with dot
+    var tdSt=document.createElement('td');
+    var wrap=document.createElement('div');wrap.className='flex items-center gap-1';
+    var dot=document.createElement('div');
+    dot.className='sdot '+(d.status==='online'?'dot-on':d.status==='updating'?'dot-upd':'dot-off');
+    var stTxt=document.createElement('span');stTxt.className='text-xs';stTxt.textContent=d.status==='updating'?'updating...':d.status;
+    wrap.appendChild(dot);wrap.appendChild(stTxt);tdSt.appendChild(wrap);tr.appendChild(tdSt);
+    // last seen
+    tr.appendChild(mkTd(d.seen,'text-xs text-base-content/40'));
+    // ip
+    tr.appendChild(mkTd(d.ip,'font-mono text-xs text-base-content/40'));
+    // action
+    var tdAct=document.createElement('td');var btn=document.createElement('button');btn.className='btn btn-xs btn-ghost';btn.textContent='Manage';tdAct.appendChild(btn);tr.appendChild(tdAct);
+    tbody.appendChild(tr);
+  });
+}
+
+// OTA table
+var otaData=[
+  {name:'3/Cupboard',from:'v1.0.0',to:'v1.1.0',status:'online'},
+  {name:'7/Garage',  from:'v1.0.0',to:'v1.1.0',status:'online'},
+  {name:'12/Garden', from:'v1.0.0',to:'v1.1.0',status:'offline'},
+];
+function buildOTA(){
+  var tbody=document.getElementById('ota-tbody');
+  otaData.forEach(function(d){
+    var tr=document.createElement('tr');
+    var tdCb=document.createElement('td');var cb=document.createElement('input');cb.type='checkbox';cb.className='checkbox checkbox-xs';cb.checked=true;tdCb.appendChild(cb);tr.appendChild(tdCb);
+    tr.appendChild(mkTd(d.name,'font-mono text-xs'));
+    var tdFrom=document.createElement('td');tdFrom.appendChild(mkBadge(d.from,'badge-warning'));tr.appendChild(tdFrom);
+    var tdTo=document.createElement('td');tdTo.appendChild(mkBadge(d.to,'badge-success'));tr.appendChild(tdTo);
+    tr.appendChild(mkTd(d.status,'text-xs '+(d.status==='online'?'text-success':'text-base-content/40')));
+    var tdBtn=document.createElement('td');
+    var btn=document.createElement('button');
+    btn.className=d.status==='online'?'btn btn-xs btn-warning':'btn btn-xs btn-ghost btn-disabled';
+    btn.textContent=d.status==='online'?'Update now':'On reconnect';
+    tdBtn.appendChild(btn);tr.appendChild(tdBtn);
+    tbody.appendChild(tr);
+  });
+}
+
+// Firmware table
+var fwData=[
+  {ver:'v1.1.0',latest:true, date:'2026-04-14',boards:'ESP32-C3, H2',count:49,notes:'OTA stability fix, BH1750 poll fix'},
+  {ver:'v1.0.0',latest:false,date:'2026-03-01',boards:'ESP32-C3',    count:3, notes:'Initial release'},
+];
+function buildFW(){
+  var tbody=document.getElementById('fw-tbody');
+  fwData.forEach(function(d){
+    var tr=document.createElement('tr');
+    var tdVer=document.createElement('td');
+    var b=mkBadge(d.ver,d.latest?'badge-success font-mono':'badge-warning font-mono');
+    tdVer.appendChild(b);
+    if(d.latest){var lbl=mkBadge('latest','badge-primary ml-1');tdVer.appendChild(lbl);}
+    tr.appendChild(tdVer);
+    tr.appendChild(mkTd(d.date,'text-xs text-base-content/50'));
+    tr.appendChild(mkTd(d.boards,'text-xs'));
+    tr.appendChild(mkTd(String(d.count),'text-xs'));
+    tr.appendChild(mkTd(d.notes,'text-xs text-base-content/50'));
+    var tdAct=document.createElement('td');
+    var btn=document.createElement('button');
+    btn.className=d.latest?'btn btn-xs btn-ghost':'btn btn-xs btn-ghost text-error';
+    btn.textContent=d.latest?'Set default':'Remove';
+    tdAct.appendChild(btn);tr.appendChild(tdAct);
+    tbody.appendChild(tr);
+  });
+}
+
+// Flash naming rows
+var flashNames=['Bedroom'];
+function buildFlashNames(){
+  var list=document.getElementById('flash-names');
+  flashNames.forEach(function(n,i){addFlashRowWith(i+1,n,list);});
+}
+function addFlashRowWith(num,val,list){
+  var row=document.createElement('div');row.className='flex gap-2 items-center';
+  var badge=document.createElement('span');badge.className='badge badge-outline badge-sm font-mono w-10 justify-center';badge.textContent=String(num);
+  var inp=document.createElement('input');inp.className='input input-sm input-bordered flex-1';inp.value=val;inp.placeholder='Room name';
+  var st=document.createElement('span');st.className='text-xs '+(num===1?'text-base-content/40':'text-base-content/30');
+  st.textContent=num===1?'/dev/ttyUSB0 online':'not connected';
+  row.appendChild(badge);row.appendChild(inp);row.appendChild(st);
+  (list||document.getElementById('flash-names')).appendChild(row);
+}
+var flashCount=1;
+function addFlashRow(){
+  flashCount++;
+  addFlashRowWith(flashCount,'',null);
+}
+
+function filterMods(cat,el){
+  document.querySelectorAll('.tabs .tab').forEach(function(t){t.classList.remove('tab-active');});
+  el.classList.add('tab-active');
+  document.querySelectorAll('[data-cat]').forEach(function(c){
+    c.style.display=(cat==='all'||c.dataset.cat===cat)?'':'none';
+  });
+}
+
+buildFleet();
+buildOTA();
+buildFW();
+buildFlashNames();
+</script>
+</body>
+</html>

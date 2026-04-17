@@ -1,0 +1,105 @@
+<h2>System Architecture — Updated</h2>
+<p class="subtitle">Unlimited fleet · variable USB ports · template-driven hardware config</p>
+
+<div style="font-family: monospace; font-size: 13px; line-height: 1.6; background: #111; color: #e0e0e0; border-radius: 12px; padding: 28px 32px; margin: 16px 0;">
+
+  <div style="display: flex; gap: 28px; align-items: flex-start; flex-wrap: wrap;">
+
+    <!-- Left: RPi + Docker -->
+    <div style="flex: 1.2; min-width: 270px;">
+      <div style="border: 2px solid #6366f1; border-radius: 10px; padding: 16px; background: #1a1a2e;">
+        <div style="color: #a5b4fc; font-weight: bold; font-size: 14px; margin-bottom: 12px;">🖥️ Docker Container (any host)</div>
+
+        <div style="border: 1px solid #4f46e5; border-radius: 8px; padding: 12px; background: #12122a; margin-bottom: 10px;">
+          <div style="color: #818cf8; font-size: 12px; margin-bottom: 6px;">Go Backend</div>
+          <div style="color: #cbd5e1; font-size: 11px; line-height: 1.8;">
+            ├─ USB Port Manager (N ports, user-defined)<br>
+            ├─ esptool Flash Runner<br>
+            ├─ Config Compiler + NVS Push<br>
+            ├─ PSK Generator<br>
+            ├─ OTA HTTP Server<br>
+            ├─ Device Registry (SQLite, unlimited)<br>
+            └─ REST API
+          </div>
+        </div>
+
+        <div style="border: 1px solid #4f46e5; border-radius: 8px; padding: 12px; background: #12122a; margin-bottom: 10px;">
+          <div style="color: #818cf8; font-size: 12px; margin-bottom: 6px;">Svelte + DaisyUI Frontend</div>
+          <div style="color: #cbd5e1; font-size: 11px; line-height: 1.8;">
+            ├─ Flash Wizard<br>
+            ├─ Hardware Template Builder ⬅ new<br>
+            ├─ Fleet Dashboard (unlimited)<br>
+            └─ OTA Update Manager
+          </div>
+        </div>
+
+        <div style="border: 2px solid #34d399; border-radius: 8px; padding: 12px; background: #051a10;">
+          <div style="color: #34d399; font-size: 12px; margin-bottom: 6px;">📦 Hardware Template Engine</div>
+          <div style="color: #cbd5e1; font-size: 11px; line-height: 1.8;">
+            ├─ Base hardware profiles<br>
+            │   ESP32-C3 · ESP32-H2 · custom<br>
+            ├─ Module library (DRV8833, WRGB…)<br>
+            ├─ Pin mapper (PINx → function)<br>
+            └─ NVS config blob generator
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Middle arrows -->
+    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding-top: 80px; min-width: 90px;">
+      <div style="text-align: center;">
+        <div style="color: #f59e0b; font-size: 11px; margin-bottom: 4px;">USB (×N)</div>
+        <div style="color: #fbbf24; font-size: 22px;">⟺</div>
+        <div style="color: #94a3b8; font-size: 10px;">flash + config</div>
+      </div>
+      <div style="text-align: center;">
+        <div style="color: #34d399; font-size: 11px; margin-bottom: 4px;">WiFi OTA</div>
+        <div style="color: #6ee7b7; font-size: 22px;">⟺</div>
+        <div style="color: #94a3b8; font-size: 10px;">PSK-auth</div>
+      </div>
+    </div>
+
+    <!-- Right: ESP32 + Matter -->
+    <div style="flex: 1; min-width: 260px; display: flex; flex-direction: column; gap: 12px;">
+      <div style="border: 2px solid #f59e0b; border-radius: 10px; padding: 14px; background: #1c1a0a;">
+        <div style="color: #fcd34d; font-weight: bold; font-size: 13px; margin-bottom: 8px;">⚡ ESP32-C3 / H2 / … (Universal FW)</div>
+        <div style="color: #cbd5e1; font-size: 11px; line-height: 1.8;">
+          Matter Bridge<br>
+          ├─ Endpoint N: module from template<br>
+          ├─ NVS: pin map · module types<br>
+          ├─ NVS: PSK · WiFi · Matter PAI<br>
+          └─ OTA client (PSK-authenticated)
+        </div>
+      </div>
+
+      <div style="color: #64748b; font-size: 11px; text-align: center;">× unlimited deployed devices</div>
+
+      <div style="border: 1px dashed #475569; border-radius: 8px; padding: 10px; background: #0f172a; text-align: center;">
+        <div style="color: #94a3b8; font-size: 11px;">Matter Ecosystem</div>
+        <div style="color: #64748b; font-size: 10px; margin-top: 4px;">Home Assistant · Apple Home · Google Home</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Template flow -->
+  <div style="margin-top: 20px; border: 1px solid #1e293b; border-radius: 8px; padding: 14px; background: #0d1117;">
+    <div style="color: #34d399; font-size: 12px; margin-bottom: 10px;">Config Template Flow</div>
+    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 11px; color: #94a3b8;">
+      <span style="background:#1e293b;padding:4px 10px;border-radius:6px;">1. Pick base HW<br><span style="color:#6366f1">ESP32-C3 / H2</span></span>
+      <span style="color:#475569">→</span>
+      <span style="background:#1e293b;padding:4px 10px;border-radius:6px;">2. Add modules<br><span style="color:#6366f1">DRV8833, WRGB…</span></span>
+      <span style="color:#475569">→</span>
+      <span style="background:#1e293b;padding:4px 10px;border-radius:6px;">3. Map pins<br><span style="color:#6366f1">GPIO4 = IN1…</span></span>
+      <span style="color:#475569">→</span>
+      <span style="background:#1e293b;padding:4px 10px;border-radius:6px;">4. Set behavior<br><span style="color:#6366f1">firefly effect…</span></span>
+      <span style="color:#475569">→</span>
+      <span style="background:#1e293b;padding:4px 10px;border-radius:6px;">5. Compile NVS<br><span style="color:#6366f1">binary blob</span></span>
+      <span style="color:#475569">→</span>
+      <span style="background:#1e293b;padding:4px 10px;border-radius:6px;">6. Flash + push<br><span style="color:#6366f1">via USB</span></span>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top: 12px;">Architecture updated. Does the template flow look right?</p>

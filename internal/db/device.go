@@ -69,3 +69,11 @@ func (d *Database) UpdateDeviceStatus(id, status, ip string) error {
 		status, ip, id)
 	return err
 }
+
+// UpdateDeviceFWVersion records the firmware version reported by a device on check-in.
+func (d *Database) UpdateDeviceFWVersion(id, fwVersion, ip string) error {
+	_, err := d.DB.Exec(
+		`UPDATE devices SET fw_version = ?, ip = ?, last_seen = CURRENT_TIMESTAMP, status = 'online' WHERE id = ?`,
+		fwVersion, ip, id)
+	return err
+}

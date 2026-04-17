@@ -1,0 +1,7 @@
+{"type":"server-started","port":48060,"host":"0.0.0.0","url_host":"localhost","url":"http://localhost:48060","screen_dir":"/home/Karthangar/Projets/MatterESP32Multicontroller/.superpowers/brainstorm/1776281-1776332453/content","state_dir":"/home/Karthangar/Projets/MatterESP32Multicontroller/.superpowers/brainstorm/1776281-1776332453/state"}
+{"type":"screen-added","file":"/home/Karthangar/Projets/MatterESP32Multicontroller/.superpowers/brainstorm/1776281-1776332453/content/architecture.html"}
+{"type":"screen-added","file":"/home/Karthangar/Projets/MatterESP32Multicontroller/.superpowers/brainstorm/1776281-1776332453/content/architecture-v2.html"}
+{"type":"screen-added","file":"/home/Karthangar/Projets/MatterESP32Multicontroller/.superpowers/brainstorm/1776281-1776332453/content/template-builder.html"}
+{"type":"screen-added","file":"/home/Karthangar/Projets/MatterESP32Multicontroller/.superpowers/brainstorm/1776281-1776332453/content/template-wizard.html"}
+{"type":"screen-added","file":"/home/Karthangar/Projets/MatterESP32Multicontroller/.superpowers/brainstorm/1776281-1776332453/content/template-wizard-v2.html"}
+{"type":"server-stopped","reason":"idle timeout"}

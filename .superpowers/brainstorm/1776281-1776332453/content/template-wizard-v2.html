@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="night">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hardware Template Builder</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  html, body { height: 100%; margin: 0; overflow: hidden; }
+  body { display: flex; flex-direction: column; }
+  #app { display: flex; flex-direction: column; height: 100vh; width: 100vw; overflow: hidden; }
+  .panel { display: none; flex: 1; overflow-y: auto; padding: 1rem 1.5rem; }
+  .panel.active { display: flex; flex-direction: column; }
+  .footer-bar { flex-shrink: 0; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Header -->
+  <div class="navbar bg-base-300 border-b border-base-200 px-4 min-h-12 flex-shrink-0">
+    <div class="navbar-start">
+      <span class="font-bold text-sm">&#9889; Hardware Template Builder</span>
+    </div>
+    <div class="navbar-center">
+      <ul class="steps steps-horizontal text-xs">
+        <li id="step-0" class="step step-primary cursor-pointer" onclick="showTab(0)">Hardware</li>
+        <li id="step-1" class="step cursor-pointer" onclick="showTab(1)">Modules</li>
+        <li id="step-2" class="step cursor-pointer" onclick="showTab(2)">Pin Map</li>
+        <li id="step-3" class="step cursor-pointer" onclick="showTab(3)">Matter</li>
+        <li id="step-4" class="step cursor-pointer" onclick="showTab(4)">Flash</li>
+      </ul>
+    </div>
+    <div class="navbar-end">
+      <span class="badge badge-outline badge-sm" id="step-label">Step 1 / 5</span>
+    </div>
+  </div>
+
+  <!-- PANEL 1: Base Hardware -->
+  <div class="panel active" id="panel-0">
+    <h2 class="text-base font-semibold mb-1">Select base hardware</h2>
+    <p class="text-xs text-base-content/50 mb-4">Choose the ESP32 variant your physical device uses.</p>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+      <div class="card bg-primary/10 border border-primary cursor-pointer hw-card selected" onclick="selectHW(this)">
+        <div class="card-body p-4">
+          <h3 class="card-title text-sm">ESP32-C3</h3>
+          <p class="text-xs text-base-content/60">Single-core RISC-V · WiFi + BLE 5</p>
+          <div class="flex flex-wrap gap-1 mt-2">
+            <span class="badge badge-xs badge-primary">22 GPIO</span>
+            <span class="badge badge-xs badge-primary">6 ADC</span>
+            <span class="badge badge-xs badge-primary">2x I2C</span>
+          </div>
+        </div>
+      </div>
+      <div class="card bg-base-200 border border-base-300 cursor-pointer hw-card" onclick="selectHW(this)">
+        <div class="card-body p-4">
+          <h3 class="card-title text-sm">ESP32-H2</h3>
+          <p class="text-xs text-base-content/60">RISC-V · Thread 802.15.4 + BLE 5</p>
+          <div class="flex flex-wrap gap-1 mt-2">
+            <span class="badge badge-xs">19 GPIO</span>
+            <span class="badge badge-xs">5 ADC</span>
+            <span class="badge badge-xs">2x I2C</span>
+          </div>
+        </div>
+      </div>
+      <div class="card bg-base-200 border border-base-300 cursor-pointer hw-card" onclick="selectHW(this)">
+        <div class="card-body p-4">
+          <h3 class="card-title text-sm">ESP32-S3</h3>
+          <p class="text-xs text-base-content/60">Dual-core Xtensa · WiFi + BLE 5</p>
+          <div class="flex flex-wrap gap-1 mt-2">
+            <span class="badge badge-xs">45 GPIO</span>
+            <span class="badge badge-xs">20 ADC</span>
+            <span class="badge badge-xs">2x I2C</span>
+          </div>
+        </div>
+      </div>
+      <div class="card bg-base-200 border border-base-300 border-dashed cursor-pointer hw-card" onclick="selectHW(this)">
+        <div class="card-body p-4 items-center justify-center text-center">
+          <span class="text-2xl">+</span>
+          <h3 class="card-title text-sm mt-1">Custom board</h3>
+          <p class="text-xs text-base-content/50">Define your own pin layout</p>
+        </div>
+      </div>
+    </div>
+    <div class="divider text-xs">or</div>
+    <button class="btn btn-outline btn-sm w-56">Import board profile (.yaml / .json)</button>
+  </div>
+
+  <!-- PANEL 2: Modules -->
+  <div class="panel" id="panel-1">
+    <div class="flex gap-4 flex-1 min-h-0">
+      <div class="flex-1 flex flex-col min-w-0">
+        <h2 class="text-base font-semibold mb-1">Module library</h2>
+        <p class="text-xs text-base-content/50 mb-3">Add pre-built modules or import community definitions.</p>
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 overflow-y-auto">
+          <div class="card bg-base-200 border border-base-300 compact">
+            <div class="card-body p-3">
+              <div class="flex justify-between items-start">
+                <h4 class="font-semibold text-sm">DRV8833</h4>
+                <button class="btn btn-xs btn-primary">+</button>
+              </div>
+              <p class="text-xs text-base-content/50">Dual H-bridge driver</p>
+              <div class="flex gap-1 mt-1 flex-wrap">
+                <span class="badge badge-xs badge-secondary">4x PWM</span>
+                <span class="badge badge-xs">bidirectional</span>
+              </div>
+            </div>
+          </div>
+          <div class="card bg-base-200 border border-base-300 compact">
+            <div class="card-body p-3">
+              <div class="flex justify-between items-start">
+                <h4 class="font-semibold text-sm">WRGB LED</h4>
+                <button class="btn btn-xs btn-primary">+</button>
+              </div>
+              <p class="text-xs text-base-content/50">4-channel PWM light</p>
+              <div class="flex gap-1 mt-1 flex-wrap">
+                <span class="badge badge-xs badge-secondary">4x PWM</span>
+                <span class="badge badge-xs">color</span>
+              </div>
+            </div>
+          </div>
+          <div class="card bg-base-200 border border-base-300 compact">
+            <div class="card-body p-3">
+              <div class="flex justify-between items-start">
+                <h4 class="font-semibold text-sm">BH1750</h4>
+                <button class="btn btn-xs btn-primary">+</button>
+              </div>
+              <p class="text-xs text-base-content/50">Ambient light sensor</p>
+              <div class="flex gap-1 mt-1">
+                <span class="badge badge-xs badge-accent">I2C</span>
+                <span class="badge badge-xs">sensor</span>
+              </div>
+            </div>
+          </div>
+          <div class="card bg-base-200 border border-base-300 compact">
+            <div class="card-body p-3">
+              <div class="flex justify-between items-start">
+                <h4 class="font-semibold text-sm">VEML7700</h4>
+                <button class="btn btn-xs btn-primary">+</button>
+              </div>
+              <p class="text-xs text-base-content/50">High dynamic lux sensor</p>
+              <div class="flex gap-1 mt-1">
+                <span class="badge badge-xs badge-accent">I2C</span>
+                <span class="badge badge-xs">sensor</span>
+              </div>
+            </div>
+          </div>
+          <div class="card bg-base-200 border border-base-300 compact">
+            <div class="card-body p-3">
+              <div class="flex justify-between items-start">
+                <h4 class="font-semibold text-sm">Analog IN</h4>
+                <button class="btn btn-xs btn-primary">+</button>
+              </div>
+              <p class="text-xs text-base-content/50">Generic ADC input</p>
+              <div class="flex gap-1 mt-1">
+                <span class="badge badge-xs badge-warning">ADC</span>
+              </div>
+            </div>
+          </div>
+          <div class="card bg-base-200 border border-base-300 compact">
+            <div class="card-body p-3">
+              <div class="flex justify-between items-start">
+                <h4 class="font-semibold text-sm">Analog OUT</h4>
+                <button class="btn btn-xs btn-primary">+</button>
+              </div>
+              <p class="text-xs text-base-content/50">PWM-driven output</p>
+              <div class="flex gap-1 mt-1">
+                <span class="badge badge-xs badge-secondary">PWM</span>
+              </div>
+            </div>
+          </div>
+          <div class="card bg-base-200 border border-base-300 compact">
+            <div class="card-body p-3">
+              <div class="flex justify-between items-start">
+                <h4 class="font-semibold text-sm">GPIO Switch</h4>
+                <button class="btn btn-xs btn-primary">+</button>
+              </div>
+              <p class="text-xs text-base-content/50">Digital on/off output</p>
+              <div class="flex gap-1 mt-1">
+                <span class="badge badge-xs">digital</span>
+              </div>
+            </div>
+          </div>
+          <div class="card bg-base-200 border border-dashed border-base-300 compact cursor-pointer">
+            <div class="card-body p-3 items-center justify-center text-center">
+              <span class="text-lg">+</span>
+              <h4 class="font-semibold text-xs mt-1">Custom module</h4>
+              <p class="text-xs text-base-content/40">Define IO and Matter mapping</p>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-outline btn-sm w-56 mt-3">Import module (.yaml / .json)</button>
+      </div>
+
+      <div class="w-56 flex-shrink-0 flex flex-col">
+        <h2 class="text-base font-semibold mb-1">Active modules</h2>
+        <p class="text-xs text-base-content/50 mb-3">In this template</p>
+        <div class="flex flex-col gap-2 overflow-y-auto flex-1">
+          <div class="card bg-base-200 border border-primary/40 compact">
+            <div class="card-body p-3">
+              <div class="flex justify-between">
+                <div>
+                  <h4 class="font-semibold text-xs text-primary">DRV8833</h4>
+                  <p class="text-xs text-base-content/50">Firefly LED H-bridge</p>
+                  <span class="badge badge-xs badge-success mt-1">4 pins</span>
+                </div>
+                <button class="text-error text-base leading-none">x</button>
+              </div>
+            </div>
+          </div>
+          <div class="card bg-base-200 border border-success/40 compact">
+            <div class="card-body p-3">
+              <div class="flex justify-between">
+                <div>
+                  <h4 class="font-semibold text-xs text-success">WRGB LED</h4>
+                  <p class="text-xs text-base-content/50">4-ch PWM light</p>
+                  <span class="badge badge-xs badge-success mt-1">4 pins</span>
+                </div>
+                <button class="text-error text-base leading-none">x</button>
+              </div>
+            </div>
+          </div>
+          <div class="card bg-base-200 border border-accent/40 compact">
+            <div class="card-body p-3">
+              <div class="flex justify-between">
+                <div>
+                  <h4 class="font-semibold text-xs text-accent">BH1750</h4>
+                  <p class="text-xs text-base-content/50">Light sensor I2C</p>
+                  <span class="badge badge-xs badge-success mt-1">I2C</span>
+                </div>
+                <button class="text-error text-base leading-none">x</button>
+              </div>
+            </div>
+          </div>
+          <div class="card bg-base-200 border border-warning/40 compact">
+            <div class="card-body p-3">
+              <div class="flex justify-between">
+                <div>
+                  <h4 class="font-semibold text-xs text-warning">Analog IN</h4>
+                  <p class="text-xs text-base-content/50">ADC channel</p>
+                  <span class="badge badge-xs badge-warning mt-1">check pin</span>
+                </div>
+                <button class="text-error text-base leading-none">x</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-outline btn-xs mt-3">Export template</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PANEL 3: Pin Map -->
+  <div class="panel" id="panel-2">
+    <h2 class="text-base font-semibold mb-1">Pin Map</h2>
+    <p class="text-xs text-base-content/50 mb-3">Assign a GPIO to each module signal. Only compatible pins are shown per type.</p>
+    <div class="overflow-x-auto flex-1">
+      <table class="table table-xs table-zebra w-full">
+        <thead>
+          <tr>
+            <th>Module</th><th>Signal</th><th>Type</th><th>GPIO</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>DRV8833</td><td>IN1 (A+)</td><td><span class="badge badge-xs badge-secondary">PWM OUT</span></td><td><select class="select select-xs select-bordered w-28"><option>GPIO4</option><option>GPIO5</option><option>GPIO6</option><option>GPIO7</option></select></td><td><span class="text-success text-xs">ok</span></td></tr>
+          <tr><td>DRV8833</td><td>IN2 (A-)</td><td><span class="badge badge-xs badge-secondary">PWM OUT</span></td><td><select class="select select-xs select-bordered w-28"><option>GPIO5</option><option>GPIO4</option><option>GPIO6</option><option>GPIO7</option></select></td><td><span class="text-success text-xs">ok</span></td></tr>
+          <tr><td>DRV8833</td><td>IN3 (B+)</td><td><span class="badge badge-xs badge-secondary">PWM OUT</span></td><td><select class="select select-xs select-bordered w-28"><option>GPIO6</option><option>GPIO4</option><option>GPIO5</option><option>GPIO7</option></select></td><td><span class="text-success text-xs">ok</span></td></tr>
+          <tr><td>DRV8833</td><td>IN4 (B-)</td><td><span class="badge badge-xs badge-secondary">PWM OUT</span></td><td><select class="select select-xs select-bordered w-28"><option>GPIO7</option><option>GPIO4</option><option>GPIO5</option><option>GPIO6</option></select></td><td><span class="text-success text-xs">ok</span></td></tr>
+          <tr><td>WRGB LED</td><td>Red</td><td><span class="badge badge-xs badge-secondary">PWM OUT</span></td><td><select class="select select-xs select-bordered w-28"><option>GPIO8</option><option>GPIO9</option><option>GPIO10</option><option>GPIO11</option></select></td><td><span class="text-success text-xs">ok</span></td></tr>
+          <tr><td>WRGB LED</td><td>Green</td><td><span class="badge badge-xs badge-secondary">PWM OUT</span></td><td><select class="select select-xs select-bordered w-28"><option>GPIO9</option><option>GPIO8</option><option>GPIO10</option><option>GPIO11</option></select></td><td><span class="text-success text-xs">ok</span></td></tr>
+          <tr><td>WRGB LED</td><td>Blue</td><td><span class="badge badge-xs badge-secondary">PWM OUT</span></td><td><select class="select select-xs select-bordered w-28"><option>GPIO10</option><option>GPIO8</option><option>GPIO9</option><option>GPIO11</option></select></td><td><span class="text-success text-xs">ok</span></td></tr>
+          <tr><td>WRGB LED</td><td>White</td><td><span class="badge badge-xs badge-secondary">PWM OUT</span></td><td><select class="select select-xs select-bordered w-28"><option>GPIO11</option><option>GPIO8</option><option>GPIO9</option><option>GPIO10</option></select></td><td><span class="text-success text-xs">ok</span></td></tr>
+          <tr><td>BH1750</td><td>SDA</td><td><span class="badge badge-xs badge-accent">I2C</span></td><td><select class="select select-xs select-bordered w-28"><option>GPIO18</option><option>GPIO19</option><option>GPIO20</option></select></td><td><span class="text-success text-xs">ok</span></td></tr>
+          <tr><td>BH1750</td><td>SCL</td><td><span class="badge badge-xs badge-accent">I2C</span></td><td><select class="select select-xs select-bordered w-28"><option>GPIO19</option><option>GPIO18</option><option>GPIO20</option></select></td><td><span class="text-success text-xs">ok</span></td></tr>
+          <tr><td>Analog IN</td><td>Signal</td><td><span class="badge badge-xs badge-warning">ADC IN</span></td><td><select class="select select-xs select-bordered w-28"><option>GPIO1</option><option>GPIO2</option><option>GPIO3</option></select></td><td><span class="text-warning text-xs">shared UART0</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="alert alert-warning py-2 mt-3 text-xs">
+      GPIO1 is ADC-capable but shares UART0 on some ESP32-C3 board revisions. Confirm safe for your board revision before use.
+    </div>
+  </div>
+
+  <!-- PANEL 4: Matter Endpoints -->
+  <div class="panel" id="panel-3">
+    <h2 class="text-base font-semibold mb-1">Matter Endpoints</h2>
+    <p class="text-xs text-base-content/50 mb-3">Map each module to a Matter device type and configure its behavior.</p>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 overflow-y-auto">
+
+      <div class="card bg-base-200 border border-base-300">
+        <div class="card-body p-4">
+          <div class="flex items-center gap-2 mb-3">
+            <h4 class="font-semibold text-sm">DRV8833 — Firefly LEDs</h4>
+            <span class="badge badge-primary badge-sm">Endpoint 1</span>
+          </div>
+          <div class="form-control gap-2">
+            <div class="flex items-center gap-3">
+              <label class="label-text text-xs w-28">Matter type</label>
+              <select class="select select-sm select-bordered flex-1"><option>On/Off Light</option><option>Dimmable Light</option><option selected>Extended Color Light</option></select>
+            </div>
+            <div class="flex items-center gap-3">
+              <label class="label-text text-xs w-28">Behavior</label>
+              <select class="select select-sm select-bordered flex-1"><option selected>Firefly effect (PWM alternating)</option><option>On/Off only</option><option>Dimmer</option></select>
+            </div>
+            <div class="flex items-center gap-3">
+              <label class="label-text text-xs w-28">Name</label>
+              <input class="input input-sm input-bordered flex-1" value="Firefly Lights">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card bg-base-200 border border-base-300">
+        <div class="card-body p-4">
+          <div class="flex items-center gap-2 mb-3">
+            <h4 class="font-semibold text-sm">WRGB LED Controller</h4>
+            <span class="badge badge-secondary badge-sm">Endpoint 2</span>
+          </div>
+          <div class="form-control gap-2">
+            <div class="flex items-center gap-3">
+              <label class="label-text text-xs w-28">Matter type</label>
+              <select class="select select-sm select-bordered flex-1"><option>Dimmable Light</option><option selected>Extended Color Light</option><option>Color Temp Light</option></select>
+            </div>
+            <div class="flex items-center gap-3">
+              <label class="label-text text-xs w-28">Behavior</label>
+              <select class="select select-sm select-bordered flex-1"><option selected>Full WRGB PWM</option><option>RGB only</option><option>White only</option></select>
+            </div>
+            <div class="flex items-center gap-3">
+              <label class="label-text text-xs w-28">Name</label>
+              <input class="input input-sm input-bordered flex-1" value="WRGB Light">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card bg-base-200 border border-base-300">
+        <div class="card-body p-4">
+          <div class="flex items-center gap-2 mb-3">
+            <h4 class="font-semibold text-sm">BH1750 Light Sensor</h4>
+            <span class="badge badge-accent badge-sm">Endpoint 3</span>
+          </div>
+          <div class="form-control gap-2">
+            <div class="flex items-center gap-3">
+              <label class="label-text text-xs w-28">Matter type</label>
+              <select class="select select-sm select-bordered flex-1"><option selected>Illuminance Sensor</option><option>Occupancy Sensor</option></select>
+            </div>
+            <div class="flex items-center gap-3">
+              <label class="label-text text-xs w-28">Poll interval</label>
+              <select class="select select-sm select-bordered flex-1"><option>1s</option><option selected>5s</option><option>30s</option><option>60s</option></select>
+            </div>
+            <div class="flex items-center gap-3">
+              <label class="label-text text-xs w-28">Name</label>
+              <input class="input input-sm input-bordered flex-1" value="Light Sensor">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card bg-base-200 border border-base-300">
+        <div class="card-body p-4">
+          <div class="flex items-center gap-2 mb-3">
+            <h4 class="font-semibold text-sm">Analog IN</h4>
+            <span class="badge badge-warning badge-sm">Endpoint 4</span>
+          </div>
+          <div class="form-control gap-2">
+            <div class="flex items-center gap-3">
+              <label class="label-text text-xs w-28">Matter type</label>
+              <select class="select select-sm select-bordered flex-1"><option selected>Generic Sensor</option><option>Illuminance Sensor</option><option>Temperature Sensor</option></select>
+            </div>
+            <div class="flex items-center gap-3">
+              <label class="label-text text-xs w-28">Scale range</label>
+              <input class="input input-sm input-bordered w-20" value="0">
+              <span class="text-base-content/40 text-xs">to</span>
+              <input class="input input-sm input-bordered w-20" value="4095">
+            </div>
+            <div class="flex items-center gap-3">
+              <label class="label-text text-xs w-28">Name</label>
+              <input class="input input-sm input-bordered flex-1" value="Analog Sensor">
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- PANEL 5: Flash -->
+  <div class="panel" id="panel-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 overflow-y-auto">
+
+      <!-- Left col -->
+      <div class="flex flex-col gap-4">
+
+        <!-- Sequential naming -->
+        <div class="card bg-base-200 border border-base-300">
+          <div class="card-body p-4">
+            <h4 class="font-semibold text-sm mb-1">Sequential device naming</h4>
+            <p class="text-xs text-base-content/50 mb-3">Devices are named in flash order. Edit, add or remove entries.</p>
+            <div class="flex gap-2 mb-2 text-xs text-base-content/40">
+              <span class="w-12">#</span>
+              <span class="flex-1">Device name</span>
+            </div>
+            <div id="name-list" class="flex flex-col gap-2"></div>
+            <button class="btn btn-outline btn-xs mt-3 w-full" onclick="addNameRow()">+ Add device</button>
+            <div class="divider my-2 text-xs">preview</div>
+            <div id="name-preview" class="flex flex-col gap-1"></div>
+          </div>
+        </div>
+
+        <!-- USB ports -->
+        <div class="card bg-base-200 border border-base-300">
+          <div class="card-body p-4">
+            <h4 class="font-semibold text-sm mb-3">USB ports</h4>
+            <div class="flex flex-col gap-2">
+              <div class="flex gap-2 items-center">
+                <span class="badge badge-success font-mono text-xs">/dev/ttyUSB0</span>
+                <span class="text-success text-xs">ESP32-C3 detected</span>
+                <span class="ml-auto text-xs text-base-content/40" id="port0-label">-- Bedroom</span>
+              </div>
+              <div class="flex gap-2 items-center">
+                <span class="badge badge-outline font-mono text-xs">/dev/ttyUSB1</span>
+                <span class="text-base-content/30 text-xs">not connected</span>
+              </div>
+            </div>
+            <button class="btn btn-outline btn-xs mt-3">+ Add USB port</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right col -->
+      <div class="flex flex-col gap-4">
+        <div class="card bg-base-200 border border-base-300">
+          <div class="card-body p-4">
+            <h4 class="font-semibold text-sm mb-3">Summary</h4>
+            <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+              <span class="text-base-content/50">Board</span><span class="font-mono text-primary">ESP32-C3</span>
+              <span class="text-base-content/50">Modules</span><span>4 active</span>
+              <span class="text-base-content/50">Endpoints</span><span>4 Matter</span>
+              <span class="text-base-content/50">Pins used</span><span>11 / 22</span>
+              <span class="text-base-content/50">Template</span><span class="font-mono">firefly-hub-v1</span>
+              <span class="text-base-content/50">Warnings</span><span class="text-warning">1 (GPIO1)</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card bg-base-200 border border-base-300">
+          <div class="card-body p-4">
+            <h4 class="font-semibold text-sm mb-3">Security</h4>
+            <div class="flex flex-col gap-2 text-xs mb-3">
+              <div class="flex justify-between"><span class="text-base-content/50">PSK mode</span><span class="text-success">Auto-generated per device</span></div>
+              <div class="flex justify-between"><span class="text-base-content/50">OTA auth</span><span>PSK HMAC-SHA256</span></div>
+            </div>
+            <label class="label-text text-xs">WiFi SSID</label>
+            <input class="input input-sm input-bordered w-full mt-1 mb-2" placeholder="MyNetwork">
+            <label class="label-text text-xs">WiFi Password</label>
+            <input type="password" class="input input-sm input-bordered w-full mt-1" placeholder="password">
+          </div>
+        </div>
+
+        <div class="card bg-base-200 border border-success/40">
+          <div class="card-body p-4">
+            <h4 class="font-semibold text-sm mb-1">Ready to flash</h4>
+            <p class="text-xs text-base-content/50 mb-3">1 device connected. PSK generated at flash time.</p>
+            <div class="flex gap-2 flex-wrap">
+              <button class="btn btn-success btn-sm flex-1">Flash + Push Config</button>
+              <button class="btn btn-outline btn-sm">Save Template</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer nav -->
+  <div class="footer-bar flex justify-between items-center px-4 py-2 bg-base-300 border-t border-base-200">
+    <button class="btn btn-sm btn-ghost" onclick="prevTab()">Back</button>
+    <span class="text-xs text-base-content/40" id="step-label-footer">Step 1 / 5</span>
+    <button class="btn btn-sm btn-primary" onclick="nextTab()" id="next-btn">Next</button>
+  </div>
+
+</div>
+
+<script>
+  let current = 0;
+  const totalSteps = 5;
+
+  function showTab(i) {
+    current = i;
+    document.querySelectorAll('.panel').forEach(function(p, idx) {
+      p.classList.toggle('active', idx === i);
+    });
+    for (var s = 0; s < totalSteps; s++) {
+      var el = document.getElementById('step-' + s);
+      el.classList.toggle('step-primary', s <= i);
+    }
+    document.getElementById('step-label').textContent = 'Step ' + (i+1) + ' / ' + totalSteps;
+    document.getElementById('step-label-footer').textContent = 'Step ' + (i+1) + ' / ' + totalSteps;
+    document.getElementById('next-btn').textContent = i === totalSteps - 1 ? 'Done' : 'Next';
+  }
+
+  function nextTab() { if (current < totalSteps - 1) showTab(current + 1); }
+  function prevTab() { if (current > 0) showTab(current - 1); }
+
+  function selectHW(el) {
+    document.querySelectorAll('.hw-card').forEach(function(c) {
+      c.classList.remove('bg-primary/10', 'border-primary');
+      c.classList.add('bg-base-200', 'border-base-300');
+    });
+    el.classList.remove('bg-base-200', 'border-base-300');
+    el.classList.add('bg-primary/10', 'border-primary');
+  }
+
+  // Sequential naming — safe DOM construction
+  var initialNames = ['Bedroom', 'Attic', 'Cupboard'];
+
+  function buildNameRow(index, value) {
+    var row = document.createElement('div');
+    row.className = 'flex gap-2 items-center name-row';
+
+    var badge = document.createElement('div');
+    badge.className = 'badge badge-outline badge-sm font-mono w-12 justify-center';
+    badge.textContent = String(index);
+
+    var input = document.createElement('input');
+    input.className = 'input input-sm input-bordered flex-1';
+    input.value = value;
+    input.addEventListener('input', updatePreview);
+
+    var rmBtn = document.createElement('button');
+    rmBtn.className = 'btn btn-xs btn-ghost text-error';
+    rmBtn.textContent = 'x';
+    rmBtn.addEventListener('click', function() {
+      row.remove();
+      renumberRows();
+      updatePreview();
+    });
+
+    row.appendChild(badge);
+    row.appendChild(input);
+    row.appendChild(rmBtn);
+    return row;
+  }
+
+  function addNameRow() {
+    var list = document.getElementById('name-list');
+    var count = list.querySelectorAll('.name-row').length + 1;
+    list.appendChild(buildNameRow(count, ''));
+    updatePreview();
+  }
+
+  function renumberRows() {
+    document.querySelectorAll('.name-row').forEach(function(row, i) {
+      row.querySelector('.badge').textContent = String(i + 1);
+    });
+  }
+
+  function updatePreview() {
+    var preview = document.getElementById('name-preview');
+    while (preview.firstChild) preview.removeChild(preview.firstChild);
+
+    document.querySelectorAll('.name-row').forEach(function(row, i) {
+      var val = row.querySelector('input').value || '...';
+      var line = document.createElement('div');
+      line.className = 'flex gap-2 text-xs';
+
+      var idx = document.createElement('span');
+      idx.className = 'font-mono text-base-content/40';
+      idx.textContent = (i+1) + ' ->';
+
+      var name = document.createElement('span');
+      name.className = 'text-primary';
+      name.textContent = (i+1) + '/' + val;
+
+      line.appendChild(idx);
+      line.appendChild(name);
+      preview.appendChild(line);
+    });
+  }
+
+  // Initialize name rows
+  (function init() {
+    var list = document.getElementById('name-list');
+    initialNames.forEach(function(name, i) {
+      list.appendChild(buildNameRow(i + 1, name));
+    });
+    updatePreview();
+  })();
+</script>
+</body>
+</html>

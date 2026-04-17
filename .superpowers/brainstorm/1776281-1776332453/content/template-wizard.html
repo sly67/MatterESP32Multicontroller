@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hardware Template Builder</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0f1117; color: #a6adbb; font-family: 'Inter', sans-serif; font-size: 13px; min-height: 100vh; }
+  h1 { color: #fff; font-size: 18px; padding: 20px 24px 0; }
+  .subtitle { color: #64748b; font-size: 12px; padding: 4px 24px 16px; }
+
+  /* Tabs */
+  .tabs { display: flex; background: #151b22; border-bottom: 1px solid #2a323c; padding: 0 24px; overflow-x: auto; }
+  .tab { padding: 11px 18px; font-size: 12px; cursor: pointer; white-space: nowrap; color: #64748b; border-bottom: 2px solid transparent; transition: all .15s; }
+  .tab:hover { color: #a6adbb; }
+  .tab.active { color: #fff; border-bottom-color: #6366f1; font-weight: 600; }
+
+  /* Panels */
+  .panel { display: none; padding: 20px 24px; }
+  .panel.active { display: block; }
+
+  /* Cards */
+  .hw-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-top: 8px; }
+  .hw-card { background: #1d232a; border: 2px solid #2a323c; border-radius: 10px; padding: 14px; cursor: pointer; transition: all .15s; }
+  .hw-card:hover { border-color: #4f46e5; }
+  .hw-card.selected { border-color: #6366f1; background: #1e1b4b; }
+  .hw-card h3 { color: #fff; font-size: 13px; margin-bottom: 4px; }
+  .hw-card p { font-size: 10px; color: #64748b; line-height: 1.6; }
+  .hw-card .badge { display: inline-block; background: #2a323c; color: #a5b4fc; font-size: 9px; padding: 2px 6px; border-radius: 10px; margin-top: 6px; margin-right: 3px; }
+
+  /* Module library */
+  .modules-layout { display: flex; gap: 16px; }
+  .mod-library { flex: 1; }
+  .mod-active { width: 220px; flex-shrink: 0; }
+  .section-title { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 8px; }
+  .mod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+  .mod-card { background: #1d232a; border: 1px solid #2a323c; border-radius: 8px; padding: 10px; cursor: pointer; transition: all .15s; position: relative; }
+  .mod-card:hover { border-color: #4f46e5; }
+  .mod-card h4 { color: #fff; font-size: 12px; margin-bottom: 3px; }
+  .mod-card p { font-size: 10px; color: #64748b; }
+  .mod-card .tag { font-size: 9px; background: #2a323c; color: #94a3b8; padding: 2px 6px; border-radius: 8px; margin-top: 5px; display: inline-block; }
+  .mod-card .add-btn { position: absolute; top: 8px; right: 8px; background: #4f46e5; color: #fff; border: none; border-radius: 4px; width: 20px; height: 20px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; }
+  .active-list { display: flex; flex-direction: column; gap: 8px; }
+  .active-mod { background: #1d232a; border: 1px solid #2a323c; border-radius: 8px; padding: 10px; display: flex; justify-content: space-between; align-items: flex-start; }
+  .active-mod h4 { color: #fff; font-size: 12px; }
+  .active-mod p { font-size: 10px; color: #64748b; margin-top: 2px; }
+  .active-mod .rm { color: #ef4444; cursor: pointer; font-size: 16px; line-height: 1; }
+  .import-btn { background: #1d232a; border: 1px dashed #475569; color: #94a3b8; padding: 8px 12px; border-radius: 8px; font-size: 11px; cursor: pointer; text-align: center; margin-top: 8px; }
+  .import-btn:hover { border-color: #6366f1; color: #a5b4fc; }
+
+  /* Pin map */
+  .pin-table { width: 100%; border-collapse: collapse; }
+  .pin-table th { background: #151b22; color: #64748b; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; padding: 8px 10px; text-align: left; }
+  .pin-table td { padding: 7px 10px; border-bottom: 1px solid #1e293b; font-size: 12px; }
+  .pin-table tr:hover td { background: #1d232a; }
+  .pin-badge { display: inline-block; background: #2a323c; color: #a5b4fc; font-size: 10px; padding: 2px 8px; border-radius: 10px; font-family: monospace; }
+  .pin-select { background: #2a323c; border: 1px solid #374151; color: #fff; padding: 4px 8px; border-radius: 6px; font-size: 11px; cursor: pointer; }
+  .pin-select:focus { outline: 1px solid #6366f1; }
+  .conflict { color: #fbbf24; font-size: 10px; }
+  .ok { color: #4ade80; font-size: 10px; }
+
+  /* Matter endpoints */
+  .endpoint-list { display: flex; flex-direction: column; gap: 10px; }
+  .endpoint-card { background: #1d232a; border: 1px solid #2a323c; border-radius: 8px; padding: 14px; }
+  .endpoint-card h4 { color: #fff; font-size: 13px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+  .endpoint-card h4 span { background: #4f46e5; color: #fff; font-size: 10px; padding: 2px 8px; border-radius: 10px; }
+  .ep-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 6px; font-size: 11px; }
+  .ep-label { color: #64748b; width: 100px; }
+  .ep-select { background: #2a323c; border: 1px solid #374151; color: #fff; padding: 4px 8px; border-radius: 6px; font-size: 11px; }
+
+  /* Review */
+  .review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .review-block { background: #1d232a; border: 1px solid #2a323c; border-radius: 8px; padding: 14px; }
+  .review-block h4 { color: #fff; font-size: 12px; margin-bottom: 10px; border-bottom: 1px solid #2a323c; padding-bottom: 6px; }
+  .review-row { display: flex; justify-content: space-between; font-size: 11px; padding: 4px 0; border-bottom: 1px solid #1e293b; }
+  .review-row:last-child { border-bottom: none; }
+  .review-val { color: #a5b4fc; font-family: monospace; }
+  .flash-bar { margin-top: 16px; background: #1d232a; border: 1px solid #2a323c; border-radius: 8px; padding: 14px; }
+  .flash-bar h4 { color: #fff; font-size: 12px; margin-bottom: 10px; }
+  .port-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .port-badge { background: #2a323c; color: #4ade80; font-size: 11px; padding: 4px 10px; border-radius: 6px; font-family: monospace; }
+  .port-status { font-size: 10px; color: #4ade80; }
+  .psk-box { background: #0d1117; border: 1px solid #374151; border-radius: 6px; padding: 8px 12px; font-family: monospace; font-size: 11px; color: #34d399; margin-top: 6px; letter-spacing: 1px; }
+  .btn { padding: 9px 18px; border-radius: 6px; font-size: 12px; cursor: pointer; border: none; font-weight: 600; }
+  .btn-primary { background: #6366f1; color: #fff; }
+  .btn-secondary { background: #2a323c; color: #a6adbb; }
+  .btn-flash { background: #16a34a; color: #fff; padding: 10px 24px; font-size: 13px; }
+
+  /* Footer nav */
+  .footer { display: flex; justify-content: space-between; align-items: center; padding: 14px 24px; background: #151b22; border-top: 1px solid #2a323c; margin-top: 24px; }
+</style>
+</head>
+<body>
+
+<h1>Hardware Template Builder</h1>
+<p class="subtitle">Build a reusable config template for your ESP32 device</p>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab(0)">1. Base Hardware</div>
+  <div class="tab" onclick="showTab(1)">2. Modules</div>
+  <div class="tab" onclick="showTab(2)">3. Pin Map</div>
+  <div class="tab" onclick="showTab(3)">4. Matter Endpoints</div>
+  <div class="tab" onclick="showTab(4)">5. Review &amp; Flash</div>
+</div>
+
+<!-- PANEL 1: Base Hardware -->
+<div class="panel active" id="panel-0">
+  <div class="section-title">Select base hardware</div>
+  <div class="hw-grid">
+    <div class="hw-card selected" onclick="selectHW(this)">
+      <h3>ESP32-C3</h3>
+      <p>Single-core RISC-V<br>2.4 GHz WiFi + BLE 5</p>
+      <span class="badge">22 GPIO</span>
+      <span class="badge">6 ADC</span>
+      <span class="badge">2× I2C</span>
+    </div>
+    <div class="hw-card" onclick="selectHW(this)">
+      <h3>ESP32-H2</h3>
+      <p>RISC-V<br>802.15.4 Thread + BLE 5</p>
+      <span class="badge">19 GPIO</span>
+      <span class="badge">5 ADC</span>
+      <span class="badge">2× I2C</span>
+    </div>
+    <div class="hw-card" onclick="selectHW(this)">
+      <h3>ESP32-S3</h3>
+      <p>Dual-core Xtensa<br>2.4 GHz WiFi + BLE 5</p>
+      <span class="badge">45 GPIO</span>
+      <span class="badge">20 ADC</span>
+      <span class="badge">2× I2C</span>
+    </div>
+    <div class="hw-card" onclick="selectHW(this)" style="border-style: dashed;">
+      <h3>+ Custom board</h3>
+      <p>Define your own pin layout and capabilities</p>
+      <span class="badge">manual</span>
+    </div>
+  </div>
+  <div class="import-btn" style="max-width:220px; margin-top: 16px;">📥 Import board profile (.yaml / .json)</div>
+</div>
+
+<!-- PANEL 2: Modules -->
+<div class="panel" id="panel-1">
+  <div class="modules-layout">
+    <div class="mod-library">
+      <div class="section-title">Module library</div>
+      <div class="mod-grid">
+        <div class="mod-card">
+          <button class="add-btn">+</button>
+          <h4>DRV8833</h4>
+          <p>Dual H-bridge motor driver</p>
+          <span class="tag">4× PWM</span>
+          <span class="tag">bidirectional</span>
+        </div>
+        <div class="mod-card">
+          <button class="add-btn">+</button>
+          <h4>WRGB LED</h4>
+          <p>4-channel PWM light</p>
+          <span class="tag">4× PWM</span>
+          <span class="tag">color</span>
+        </div>
+        <div class="mod-card">
+          <button class="add-btn">+</button>
+          <h4>BH1750</h4>
+          <p>Ambient light sensor I2C</p>
+          <span class="tag">I2C</span>
+          <span class="tag">sensor</span>
+        </div>
+        <div class="mod-card">
+          <button class="add-btn">+</button>
+          <h4>VEML7700</h4>
+          <p>High dynamic lux sensor</p>
+          <span class="tag">I2C</span>
+          <span class="tag">sensor</span>
+        </div>
+        <div class="mod-card">
+          <button class="add-btn">+</button>
+          <h4>Analog IN</h4>
+          <p>Generic ADC input channel</p>
+          <span class="tag">ADC</span>
+        </div>
+        <div class="mod-card">
+          <button class="add-btn">+</button>
+          <h4>Analog OUT</h4>
+          <p>PWM-driven analog output</p>
+          <span class="tag">PWM</span>
+        </div>
+        <div class="mod-card">
+          <button class="add-btn">+</button>
+          <h4>GPIO Switch</h4>
+          <p>Digital on/off output</p>
+          <span class="tag">digital</span>
+        </div>
+        <div class="mod-card" style="border-style: dashed;">
+          <h4>+ Custom module</h4>
+          <p>Define IO, behavior &amp; Matter mapping</p>
+          <span class="tag">manual</span>
+        </div>
+      </div>
+      <div class="import-btn" style="max-width: 240px; margin-top: 8px;">📥 Import module (.yaml / .json)</div>
+    </div>
+
+    <div class="mod-active">
+      <div class="section-title">Active in this template</div>
+      <div class="active-list">
+        <div class="active-mod">
+          <div>
+            <h4>DRV8833</h4>
+            <p>Firefly LED H-bridge</p>
+          </div>
+          <span class="rm">×</span>
+        </div>
+        <div class="active-mod">
+          <div>
+            <h4>WRGB LED</h4>
+            <p>4-ch PWM light</p>
+          </div>
+          <span class="rm">×</span>
+        </div>
+        <div class="active-mod">
+          <div>
+            <h4>BH1750</h4>
+            <p>Light sensor I2C</p>
+          </div>
+          <span class="rm">×</span>
+        </div>
+        <div class="active-mod">
+          <div>
+            <h4>Analog IN</h4>
+            <p>ADC channel</p>
+          </div>
+          <span class="rm">×</span>
+        </div>
+      </div>
+      <div class="import-btn" style="margin-top: 12px;">📤 Export template</div>
+    </div>
+  </div>
+</div>
+
+<!-- PANEL 3: Pin Map -->
+<div class="panel" id="panel-2">
+  <div class="section-title">Assign GPIO pins to each module IO</div>
+  <table class="pin-table">
+    <thead>
+      <tr>
+        <th>Module</th>
+        <th>Signal</th>
+        <th>Type</th>
+        <th>Assign GPIO</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>DRV8833</td>
+        <td>IN1 (A+)</td>
+        <td><span class="pin-badge">PWM OUT</span></td>
+        <td>
+          <select class="pin-select">
+            <option>GPIO4</option><option>GPIO5</option><option>GPIO6</option><option>GPIO7</option><option>GPIO8</option>
+          </select>
+        </td>
+        <td class="ok">✓ ok</td>
+      </tr>
+      <tr>
+        <td>DRV8833</td>
+        <td>IN2 (A-)</td>
+        <td><span class="pin-badge">PWM OUT</span></td>
+        <td>
+          <select class="pin-select">
+            <option>GPIO5</option><option>GPIO4</option><option>GPIO6</option><option>GPIO7</option><option>GPIO8</option>
+          </select>
+        </td>
+        <td class="ok">✓ ok</td>
+      </tr>
+      <tr>
+        <td>DRV8833</td>
+        <td>IN3 (B+)</td>
+        <td><span class="pin-badge">PWM OUT</span></td>
+        <td>
+          <select class="pin-select">
+            <option>GPIO6</option><option>GPIO4</option><option>GPIO5</option><option>GPIO7</option>
+          </select>
+        </td>
+        <td class="ok">✓ ok</td>
+      </tr>
+      <tr>
+        <td>DRV8833</td>
+        <td>IN4 (B-)</td>
+        <td><span class="pin-badge">PWM OUT</span></td>
+        <td>
+          <select class="pin-select">
+            <option>GPIO7</option><option>GPIO4</option><option>GPIO5</option><option>GPIO6</option>
+          </select>
+        </td>
+        <td class="ok">✓ ok</td>
+      </tr>
+      <tr>
+        <td>WRGB LED</td>
+        <td>Red</td>
+        <td><span class="pin-badge">PWM OUT</span></td>
+        <td>
+          <select class="pin-select">
+            <option>GPIO8</option><option>GPIO9</option><option>GPIO10</option><option>GPIO11</option>
+          </select>
+        </td>
+        <td class="ok">✓ ok</td>
+      </tr>
+      <tr>
+        <td>WRGB LED</td>
+        <td>Green</td>
+        <td><span class="pin-badge">PWM OUT</span></td>
+        <td>
+          <select class="pin-select">
+            <option>GPIO9</option><option>GPIO8</option><option>GPIO10</option><option>GPIO11</option>
+          </select>
+        </td>
+        <td class="ok">✓ ok</td>
+      </tr>
+      <tr>
+        <td>WRGB LED</td>
+        <td>Blue</td>
+        <td><span class="pin-badge">PWM OUT</span></td>
+        <td>
+          <select class="pin-select">
+            <option>GPIO10</option><option>GPIO8</option><option>GPIO9</option><option>GPIO11</option>
+          </select>
+        </td>
+        <td class="ok">✓ ok</td>
+      </tr>
+      <tr>
+        <td>WRGB LED</td>
+        <td>White</td>
+        <td><span class="pin-badge">PWM OUT</span></td>
+        <td>
+          <select class="pin-select">
+            <option>GPIO11</option><option>GPIO8</option><option>GPIO9</option><option>GPIO10</option>
+          </select>
+        </td>
+        <td class="ok">✓ ok</td>
+      </tr>
+      <tr>
+        <td>BH1750</td>
+        <td>SDA</td>
+        <td><span class="pin-badge">I2C</span></td>
+        <td>
+          <select class="pin-select">
+            <option>GPIO18</option><option>GPIO19</option><option>GPIO20</option>
+          </select>
+        </td>
+        <td class="ok">✓ ok</td>
+      </tr>
+      <tr>
+        <td>BH1750</td>
+        <td>SCL</td>
+        <td><span class="pin-badge">I2C</span></td>
+        <td>
+          <select class="pin-select">
+            <option>GPIO19</option><option>GPIO18</option><option>GPIO20</option>
+          </select>
+        </td>
+        <td class="ok">✓ ok</td>
+      </tr>
+      <tr>
+        <td>Analog IN</td>
+        <td>Signal</td>
+        <td><span class="pin-badge">ADC IN</span></td>
+        <td>
+          <select class="pin-select">
+            <option>GPIO1</option><option>GPIO2</option><option>GPIO3</option>
+          </select>
+        </td>
+        <td class="conflict">⚠ shared UART0</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- PANEL 4: Matter Endpoints -->
+<div class="panel" id="panel-3">
+  <div class="section-title">Map modules to Matter endpoints</div>
+  <div class="endpoint-list">
+
+    <div class="endpoint-card">
+      <h4>DRV8833 — Firefly LEDs <span>Endpoint 1</span></h4>
+      <div class="ep-row">
+        <span class="ep-label">Matter type</span>
+        <select class="ep-select">
+          <option>On/Off Light</option>
+          <option>Dimmable Light</option>
+          <option selected>Extended Color Light</option>
+        </select>
+      </div>
+      <div class="ep-row">
+        <span class="ep-label">Behavior</span>
+        <select class="ep-select">
+          <option selected>Firefly effect (PWM alternating)</option>
+          <option>On/Off only</option>
+          <option>Dimmer</option>
+        </select>
+      </div>
+      <div class="ep-row">
+        <span class="ep-label">Name</span>
+        <input style="background:#2a323c;border:1px solid #374151;color:#fff;padding:4px 8px;border-radius:6px;font-size:11px;" value="Firefly Lights">
+      </div>
+    </div>
+
+    <div class="endpoint-card">
+      <h4>WRGB LED Controller <span>Endpoint 2</span></h4>
+      <div class="ep-row">
+        <span class="ep-label">Matter type</span>
+        <select class="ep-select">
+          <option>On/Off Light</option>
+          <option>Dimmable Light</option>
+          <option selected>Extended Color Light</option>
+          <option>Color Temperature Light</option>
+        </select>
+      </div>
+      <div class="ep-row">
+        <span class="ep-label">Behavior</span>
+        <select class="ep-select">
+          <option selected>Full WRGB PWM</option>
+          <option>RGB only</option>
+          <option>White only</option>
+        </select>
+      </div>
+      <div class="ep-row">
+        <span class="ep-label">Name</span>
+        <input style="background:#2a323c;border:1px solid #374151;color:#fff;padding:4px 8px;border-radius:6px;font-size:11px;" value="WRGB Light">
+      </div>
+    </div>
+
+    <div class="endpoint-card">
+      <h4>BH1750 Light Sensor <span>Endpoint 3</span></h4>
+      <div class="ep-row">
+        <span class="ep-label">Matter type</span>
+        <select class="ep-select">
+          <option selected>Illuminance Sensor</option>
+          <option>Occupancy Sensor</option>
+        </select>
+      </div>
+      <div class="ep-row">
+        <span class="ep-label">Poll interval</span>
+        <select class="ep-select">
+          <option>1s</option>
+          <option selected>5s</option>
+          <option>30s</option>
+          <option>60s</option>
+        </select>
+      </div>
+      <div class="ep-row">
+        <span class="ep-label">Name</span>
+        <input style="background:#2a323c;border:1px solid #374151;color:#fff;padding:4px 8px;border-radius:6px;font-size:11px;" value="Light Sensor">
+      </div>
+    </div>
+
+    <div class="endpoint-card">
+      <h4>Analog IN <span>Endpoint 4</span></h4>
+      <div class="ep-row">
+        <span class="ep-label">Matter type</span>
+        <select class="ep-select">
+          <option selected>Generic Sensor</option>
+          <option>Illuminance Sensor</option>
+          <option>Temperature Sensor</option>
+        </select>
+      </div>
+      <div class="ep-row">
+        <span class="ep-label">Scale</span>
+        <input style="background:#2a323c;border:1px solid #374151;color:#fff;padding:4px 8px;border-radius:6px;font-size:11px;width:60px;" value="0"> <span style="color:#64748b">→</span>
+        <input style="background:#2a323c;border:1px solid #374151;color:#fff;padding:4px 8px;border-radius:6px;font-size:11px;width:60px;" value="4095">
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- PANEL 5: Review & Flash -->
+<div class="panel" id="panel-4">
+  <div class="review-grid">
+    <div class="review-block">
+      <h4>Hardware</h4>
+      <div class="review-row"><span>Base board</span><span class="review-val">ESP32-C3</span></div>
+      <div class="review-row"><span>Modules</span><span class="review-val">4 active</span></div>
+      <div class="review-row"><span>Pins used</span><span class="review-val">11 / 22</span></div>
+      <div class="review-row"><span>Warnings</span><span style="color:#fbbf24;font-size:11px;">1 (GPIO1)</span></div>
+    </div>
+    <div class="review-block">
+      <h4>Matter Endpoints</h4>
+      <div class="review-row"><span>Endpoint 1</span><span class="review-val">Firefly Lights</span></div>
+      <div class="review-row"><span>Endpoint 2</span><span class="review-val">WRGB Light</span></div>
+      <div class="review-row"><span>Endpoint 3</span><span class="review-val">Light Sensor</span></div>
+      <div class="review-row"><span>Endpoint 4</span><span class="review-val">Analog Sensor</span></div>
+    </div>
+    <div class="review-block">
+      <h4>Template</h4>
+      <div class="review-row"><span>Name</span><span class="review-val">firefly-hub-v1</span></div>
+      <div class="review-row"><span>Target FW</span><span class="review-val">v1.0.0</span></div>
+      <div class="review-row"><span>Exportable</span><span class="review-val review-val">✓ .yaml</span></div>
+    </div>
+    <div class="review-block">
+      <h4>Security</h4>
+      <div class="review-row"><span>PSK</span><span class="review-val" style="color:#34d399;">auto-generated</span></div>
+      <div class="review-row"><span>WiFi creds</span><span class="review-val">set per device</span></div>
+      <div class="review-row"><span>OTA auth</span><span class="review-val">PSK HMAC</span></div>
+    </div>
+  </div>
+
+  <div class="flash-bar">
+    <h4>Flash to connected devices</h4>
+    <div class="port-row">
+      <span class="port-badge">/dev/ttyUSB0</span>
+      <span class="port-status">● ESP32-C3 detected</span>
+    </div>
+    <div style="font-size:11px; color:#64748b; margin-bottom:8px;">PSK will be generated and embedded per device</div>
+    <div class="psk-box">PSK: ••••••••••••••••••••••••  [auto on flash]</div>
+    <div style="margin-top: 12px; display:flex; gap: 10px;">
+      <button class="btn btn-flash">⚡ Flash + Push Config</button>
+      <button class="btn btn-secondary">💾 Save Template Only</button>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  <button class="btn btn-secondary" onclick="prevTab()">← Back</button>
+  <span id="step-indicator" style="font-size:11px; color:#64748b;">Step 1 of 5</span>
+  <button class="btn btn-primary" onclick="nextTab()">Next →</button>
+</div>
+
+<script>
+  let current = 0;
+  const tabs = document.querySelectorAll('.tab');
+  const panels = document.querySelectorAll('.panel');
+  const indicator = document.getElementById('step-indicator');
+
+  function showTab(i) {
+    current = i;
+    tabs.forEach((t, idx) => t.classList.toggle('active', idx === i));
+    panels.forEach((p, idx) => p.classList.toggle('active', idx === i));
+    indicator.textContent = 'Step ' + (i + 1) + ' of 5';
+  }
+
+  function nextTab() { if (current < 4) showTab(current + 1); }
+  function prevTab() { if (current > 0) showTab(current - 1); }
+
+  function selectHW(el) {
+    document.querySelectorAll('.hw-card').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+  }
+</script>
+</body>
+</html>
