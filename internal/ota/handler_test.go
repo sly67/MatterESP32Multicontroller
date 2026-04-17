@@ -104,3 +104,76 @@ func TestOTA_Check_WrongHMAC(t *testing.T) {
 		t.Errorf("want 401, got %d", w.Code)
 	}
 }
+
+func TestOTA_ExpiredTimestamp(t *testing.T) {
+	database := newTestDB(t)
+	psk := []byte("testpsk0123456789012345678901234")
+	err := database.CreateDevice(db.Device{
+		ID: "esp-AABBCC", Name: "test", TemplateID: "tpl-1", FWVersion: "1.0.0", PSK: psk,
+	})
+	if err != nil {
+		t.Fatalf("create device: %v", err)
+	}
+
+	// Build request with timestamp 10 minutes in the past
+	staleTS := strconv.FormatInt(time.Now().Add(-10*time.Minute).Unix(), 10)
+	msg := fmt.Sprintf("GET:/ota/check:%s", staleTS)
+	h := hmac.New(sha256.New, psk)
+	h.Write([]byte(msg))
+	sig := base64.StdEncoding.EncodeToString(h.Sum(nil))
+
+	req := httptest.NewRequest(http.MethodGet, "/ota/check", nil)
+	req.Header.Set("X-Device-ID", "esp-AABBCC")
+	req.Header.Set("X-Timestamp", staleTS)
+	req.Header.Set("X-HMAC", sig)
+
+	mux := ota.NewMux(database, t.TempDir())
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("want 401 for stale timestamp, got %d", w.Code)
+	}
+}
+
+func TestOTA_UnknownDevice(t *testing.T) {
+	database := newTestDB(t)
+	psk := []byte("testpsk0123456789012345678901234")
+
+	mux := ota.NewMux(database, t.TempDir())
+	req := signedRequest(t, http.MethodGet, "/ota/check", psk, "esp-UNKNOWN")
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("want 401 for unknown device, got %d", w.Code)
+	}
+}
+
+func TestOTA_Download_FileNotFound(t *testing.T) {
+	database := newTestDB(t)
+	psk := []byte("testpsk0123456789012345678901234")
+
+	err := database.CreateDevice(db.Device{
+		ID: "esp-AABBCC", Name: "test", TemplateID: "tpl-1", FWVersion: "1.0.0", PSK: psk,
+	})
+	if err != nil {
+		t.Fatalf("create device: %v", err)
+	}
+	// Seed firmware record but no actual file
+	if err := database.CreateFirmware(db.FirmwareRow{Version: "1.1.0", Boards: "esp32-c3", IsLatest: true}); err != nil {
+		t.Fatalf("create firmware: %v", err)
+	}
+	if err := database.SetLatestFirmware("1.1.0"); err != nil {
+		t.Fatalf("set latest firmware: %v", err)
+	}
+
+	mux := ota.NewMux(database, t.TempDir()) // empty dir — no bin file
+	req := signedRequest(t, http.MethodGet, "/ota/download", psk, "esp-AABBCC")
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("want 404 for missing bin, got %d", w.Code)
+	}
+}

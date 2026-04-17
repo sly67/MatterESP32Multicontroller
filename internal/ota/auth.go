@@ -13,6 +13,14 @@ import (
 	"github.com/karthangar/matteresp32hub/internal/db"
 )
 
+type contextKey struct{}
+
+// deviceFromContext retrieves the authenticated device stored by authMiddleware.
+func deviceFromContext(r *http.Request) db.Device {
+	dev, _ := r.Context().Value(contextKey{}).(db.Device)
+	return dev
+}
+
 const timestampTolerance = 5 * time.Minute
 
 func signatureMessage(method, path, ts string) string {
