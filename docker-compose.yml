@@ -15,12 +15,13 @@ services:
       - /Portainer/MatterESP32/logs:/data/logs
       - /Portainer/MatterESP32/certs:/data/certs
       - /Portainer/MatterESP32/matter:/data/matter
-    # Uncomment the USB devices you have connected before flashing.
-    # Docker requires the device to exist on the host at container start.
-    # devices:
-    #   - /dev/ttyUSB0:/dev/ttyUSB0
-    #   - /dev/ttyUSB1:/dev/ttyUSB1
-    #   - /dev/ttyACM0:/dev/ttyACM0
-    #   - /dev/ttyACM1:/dev/ttyACM1
+      - /dev:/dev  # exposes host /dev so plugged-in ttyUSB/ttyACM nodes are visible
+    # Dynamic USB serial access — devices appear automatically when plugged in,
+    # no container restart needed. cgroup rules grant access by device class:
+    #   188 = ttyUSB (CH340, CP210x, FTDI…)
+    #   166 = ttyACM (ESP32 native USB, Arduino…)
+    device_cgroup_rules:
+      - 'c 188:* rmw'
+      - 'c 166:* rmw'
     environment:
       - DATA_DIR=/data
