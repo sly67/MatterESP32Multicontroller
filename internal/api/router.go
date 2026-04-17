@@ -24,6 +24,7 @@ func NewRouter(cfg *config.Config, database *db.Database) http.Handler {
 	r.Route("/api/firmware", firmwareRouter(database))
 	r.Route("/api/flash", flashRouter(database))
 	r.Route("/api/settings", settingsRouter(cfg, database))
+	r.Route("/api/ota", otaRouter(database))
 
 	// Frontend — served from embedded FS (wired in Task 7)
 	r.Handle("/*", staticHandler())

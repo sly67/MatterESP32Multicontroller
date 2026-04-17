@@ -9,6 +9,7 @@ import (
 
 	"github.com/karthangar/matteresp32hub/internal/config"
 	"github.com/karthangar/matteresp32hub/internal/db"
+	"github.com/karthangar/matteresp32hub/internal/ota"
 )
 
 // Server holds the HTTP server configuration.
@@ -39,8 +40,8 @@ func (s *Server) ListenAndServeTLS() error {
 	return srv.ListenAndServe()
 }
 
-// ListenAndServeOTA starts a placeholder HTTPS server on OTAPort.
-// Full OTA handler is implemented in Plan 4.
+// ListenAndServeOTA starts the PSK-authenticated HTTPS OTA server on OTAPort.
+// ESP32 devices connect directly (no Traefik) so this server handles its own TLS.
 func (s *Server) ListenAndServeOTA() error {
 	cert, err := tls.LoadX509KeyPair(
 		filepath.Join(s.certsDir, "server.crt"),
@@ -52,17 +53,17 @@ func (s *Server) ListenAndServeOTA() error {
 		Certificates: []tls.Certificate{cert},
 		MinVersion:   tls.VersionTLS12,
 	}
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "OTA server not yet implemented", http.StatusServiceUnavailable)
-	})
+
+	firmwareDir := filepath.Join(s.cfg.DataDir, "firmware")
+	handler := ota.NewMux(s.database, firmwareDir)
+
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", s.cfg.OTAPort),
-		Handler:           mux,
+		Handler:           handler,
 		TLSConfig:         tlsCfg,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      60 * time.Second,
+		WriteTimeout:      120 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
 	return srv.ListenAndServeTLS("", "")

@@ -30,4 +30,5 @@ type Config struct {
 	PSKPolicy PSKPolicy `yaml:"-"`
 	WebPort   int
 	OTAPort   int
+	DataDir   string
 }

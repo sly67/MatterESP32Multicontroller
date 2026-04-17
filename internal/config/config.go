@@ -40,6 +40,7 @@ func Load(dir string) (*Config, error) {
 		PSKPolicy: psk,
 		WebPort:   app.WebPort,
 		OTAPort:   app.OTAPort,
+		DataDir:   os.Getenv("DATA_DIR"),
 	}, nil
 }
 
