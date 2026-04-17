@@ -4,15 +4,15 @@ import "time"
 
 // Device represents a registered ESP32 device.
 type Device struct {
-	ID         string
-	Name       string
-	TemplateID string
-	FWVersion  string
-	PSK        []byte
-	Status     string
-	LastSeen   *time.Time
-	IP         string
-	CreatedAt  time.Time
+	ID         string     `json:"id"`
+	Name       string     `json:"name"`
+	TemplateID string     `json:"template_id"`
+	FWVersion  string     `json:"fw_version"`
+	PSK        []byte     `json:"-"` // never expose in API responses
+	Status     string     `json:"status"`
+	LastSeen   *time.Time `json:"last_seen"`
+	IP         string     `json:"ip"`
+	CreatedAt  time.Time  `json:"created_at"`
 }
 
 // CreateDevice inserts a new device record.
