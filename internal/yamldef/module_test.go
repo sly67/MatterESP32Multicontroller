@@ -72,7 +72,7 @@ func TestParseModule_InvalidCategory(t *testing.T) {
 }
 
 func TestParseModule_InvalidIOType(t *testing.T) {
-	yaml := []byte(`
+	yamlBytes := []byte(`
 id: x
 name: x
 version: "1.0"
@@ -85,7 +85,7 @@ matter:
   endpoint_type: on_off_light
   behaviors: []
 `)
-	_, err := yamldef.ParseModule(yaml)
+	_, err := yamldef.ParseModule(yamlBytes)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "io type")
 }
