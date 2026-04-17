@@ -23,29 +23,20 @@ func NewServer(cfg *config.Config, database *db.Database, certsDir string) *Serv
 	return &Server{cfg: cfg, database: database, certsDir: certsDir}
 }
 
-// ListenAndServeTLS starts the HTTPS server on the configured port.
+// ListenAndServeTLS starts the web UI HTTP server on the configured port.
+// Plain HTTP is intentional — TLS is handled by the Traefik reverse proxy on the host.
+// OTA (port 48061) keeps its own TLS because ESP32 devices connect directly.
 func (s *Server) ListenAndServeTLS() error {
-	cert, err := tls.LoadX509KeyPair(
-		filepath.Join(s.certsDir, "server.crt"),
-		filepath.Join(s.certsDir, "server.key"))
-	if err != nil {
-		return fmt.Errorf("load TLS cert: %w", err)
-	}
-	tlsCfg := &tls.Config{
-		Certificates: []tls.Certificate{cert},
-		MinVersion:   tls.VersionTLS12,
-	}
 	handler := NewRouter(s.cfg, s.database)
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", s.cfg.WebPort),
 		Handler:           handler,
-		TLSConfig:         tlsCfg,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      60 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
-	return srv.ListenAndServeTLS("", "")
+	return srv.ListenAndServe()
 }
 
 // ListenAndServeOTA starts a placeholder HTTPS server on OTAPort.
