@@ -1,0 +1,13 @@
+id: firefly-effect
+name: "Firefly Blink"
+version: "1.0"
+compatible_with: [drv8833]
+params:
+  - {id: channel_mode, type: select,   label: "Channels",       options_from: "capability.channel_mode"}
+  - {id: decay_mode,   type: select,   label: "Decay mode",     options_from: "capability.decay_mode"}
+  - {id: speed,        type: speed,    label: "Blink speed",    default: 1.0,  unit: hz, min: 0.1, max: 10.0}
+  - {id: intensity,    type: percent,  label: "Max brightness", default: 0.8}
+  - {id: fade_in,      type: duration, label: "Fade in",        default: 200,  unit: ms}
+  - {id: fade_out,     type: duration, label: "Fade out",       default: 400,  unit: ms}
+  - {id: easing,       type: easing,   label: "Fade curve",     default: sine}
+  - {id: randomize,    type: bool,     label: "Random timing",  default: true}

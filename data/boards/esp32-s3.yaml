@@ -1,0 +1,39 @@
+id: esp32-s3
+name: "ESP32-S3"
+chip: ESP32-S3
+adc_channels: 20
+pwm_channels: 8
+gpio_pins:
+  - {id: GPIO1,  adc: true,  pwm: true}
+  - {id: GPIO2,  adc: true,  pwm: true}
+  - {id: GPIO3,  adc: true,  pwm: true}
+  - {id: GPIO4,  adc: true,  pwm: true}
+  - {id: GPIO5,  adc: true,  pwm: true}
+  - {id: GPIO6,  adc: true,  pwm: true}
+  - {id: GPIO7,  adc: true,  pwm: true}
+  - {id: GPIO8,  adc: true,  pwm: true}
+  - {id: GPIO9,  adc: true,  pwm: true}
+  - {id: GPIO10, adc: true,  pwm: true}
+  - {id: GPIO11, adc: true,  pwm: true}
+  - {id: GPIO12, adc: true,  pwm: true}
+  - {id: GPIO13, pwm: true}
+  - {id: GPIO14, pwm: true}
+  - {id: GPIO15, pwm: true}
+  - {id: GPIO16, pwm: true}
+  - {id: GPIO17, pwm: true}
+  - {id: GPIO18, pwm: true,  i2c: true}
+  - {id: GPIO19, pwm: true}
+  - {id: GPIO20, pwm: true}
+  - {id: GPIO21, pwm: true,  i2c: true}
+  - {id: GPIO38, pwm: true}
+  - {id: GPIO39, pwm: true}
+  - {id: GPIO40, pwm: true}
+  - {id: GPIO41, pwm: true}
+  - {id: GPIO42, pwm: true}
+  - {id: GPIO43, pwm: true}
+  - {id: GPIO44, pwm: true}
+  - {id: GPIO45, pwm: true}
+  - {id: GPIO46, pwm: true}
+i2c_buses:
+  - {id: I2C0, sda_default: GPIO18, scl_default: GPIO21}
+  - {id: I2C1, sda_default: GPIO17, scl_default: GPIO16}

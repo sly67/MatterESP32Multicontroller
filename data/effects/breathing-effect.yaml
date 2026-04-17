@@ -1,0 +1,9 @@
+id: breathing-effect
+name: "Breathing Glow"
+version: "1.0"
+compatible_with: [wrgb-led, drv8833]
+params:
+  - {id: period_s, type: duration, label: "Breath period",  default: 3.0, unit: s}
+  - {id: min_pct,  type: percent,  label: "Min brightness", default: 0.1}
+  - {id: max_pct,  type: percent,  label: "Max brightness", default: 1.0}
+  - {id: easing,   type: easing,   label: "Curve",          default: sine}

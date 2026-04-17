@@ -13,13 +13,26 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var testDBs = map[*testing.T]*db.Database{}
+
 func newTestServer(t *testing.T) http.Handler {
 	t.Helper()
 	database, err := db.Open(":memory:")
 	require.NoError(t, err)
-	t.Cleanup(func() { database.Close() })
+	t.Cleanup(func() {
+		delete(testDBs, t)
+		database.Close()
+	})
+	testDBs[t] = database
 	cfg := &config.Config{WebPort: 48060, OTAPort: 48061}
 	return api.NewRouter(cfg, database)
+}
+
+func getDatabase(t *testing.T, _ http.Handler) *db.Database {
+	t.Helper()
+	d, ok := testDBs[t]
+	require.True(t, ok, "no database registered for this test")
+	return d
 }
 
 func TestHealth(t *testing.T) {

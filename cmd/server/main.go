@@ -4,10 +4,11 @@ import (
 	"log"
 	"os"
 
+	"github.com/karthangar/matteresp32hub/internal/api"
 	"github.com/karthangar/matteresp32hub/internal/config"
 	"github.com/karthangar/matteresp32hub/internal/db"
+	"github.com/karthangar/matteresp32hub/internal/seed"
 	"github.com/karthangar/matteresp32hub/internal/tlsutil"
-	"github.com/karthangar/matteresp32hub/internal/api"
 )
 
 func main() {
@@ -26,6 +27,10 @@ func main() {
 		log.Fatalf("db: %v", err)
 	}
 	defer database.Close()
+
+	if err := seed.SeedBuiltins(database); err != nil {
+		log.Fatalf("seed: %v", err)
+	}
 
 	if err := tlsutil.EnsureCerts(certsDir); err != nil {
 		log.Fatalf("tls: %v", err)

@@ -1,0 +1,26 @@
+id: bh1750
+name: "BH1750 Ambient Light Sensor"
+version: "1.0"
+category: sensor
+io:
+  - id: SDA
+    type: i2c_data
+    label: "I2C Data"
+    constraints:
+      i2c: {speed: 400000, pullup: internal}
+  - id: SCL
+    type: i2c_clock
+    label: "I2C Clock"
+    constraints:
+      i2c: {speed: 400000, pullup: internal}
+matter:
+  endpoint_type: illuminance_sensor
+  behaviors: [lux_reporting]
+measurement:
+  trigger_interval_ms: 5000
+  max_duration_ms: 100
+  on_timeout: last_value
+  routine:
+    - {op: read_i2c, address: 0x23, bytes: 2, store: raw}
+    - {op: compute, expr: "raw / 1.2", store: lux}
+    - {op: report, value: lux, unit: lux}

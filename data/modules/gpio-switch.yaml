@@ -1,0 +1,13 @@
+id: gpio-switch
+name: "GPIO Switch"
+version: "1.0"
+category: io
+io:
+  - id: OUT
+    type: digital_out
+    label: "Output"
+    constraints:
+      digital: {active: high, initial_state: low}
+matter:
+  endpoint_type: on_off_light
+  behaviors: [on_off]

@@ -1,0 +1,26 @@
+id: esp32-c3
+name: "ESP32-C3"
+chip: ESP32-C3
+adc_channels: 6
+pwm_channels: 6
+gpio_pins:
+  - {id: GPIO0,  adc: true,  pwm: true}
+  - {id: GPIO1,  adc: true,  pwm: true, note: "shared UART0 on some board revisions"}
+  - {id: GPIO2,  adc: true,  pwm: true}
+  - {id: GPIO3,  adc: true,  pwm: true}
+  - {id: GPIO4,  pwm: true}
+  - {id: GPIO5,  pwm: true}
+  - {id: GPIO6,  pwm: true}
+  - {id: GPIO7,  pwm: true}
+  - {id: GPIO8,  pwm: true}
+  - {id: GPIO9,  pwm: true}
+  - {id: GPIO10, pwm: true}
+  - {id: GPIO11, pwm: true}
+  - {id: GPIO12, pwm: true}
+  - {id: GPIO13, pwm: true}
+  - {id: GPIO18, pwm: true,  i2c: true}
+  - {id: GPIO19, pwm: true,  i2c: true}
+  - {id: GPIO20, pwm: true}
+  - {id: GPIO21, pwm: true}
+i2c_buses:
+  - {id: I2C0, sda_default: GPIO18, scl_default: GPIO19}

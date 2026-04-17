@@ -1,0 +1,28 @@
+id: wrgb-led
+name: "WRGB LED Controller"
+version: "1.0"
+category: driver
+io:
+  - id: R
+    type: digital_pwm_out
+    label: "Red channel"
+    constraints:
+      pwm: {frequency_hz: 1000, duty_min: 0.0, duty_max: 1.0, resolution_bits: 10}
+  - id: G
+    type: digital_pwm_out
+    label: "Green channel"
+    constraints:
+      pwm: {frequency_hz: 1000, duty_min: 0.0, duty_max: 1.0, resolution_bits: 10}
+  - id: B
+    type: digital_pwm_out
+    label: "Blue channel"
+    constraints:
+      pwm: {frequency_hz: 1000, duty_min: 0.0, duty_max: 1.0, resolution_bits: 10}
+  - id: W
+    type: digital_pwm_out
+    label: "White channel"
+    constraints:
+      pwm: {frequency_hz: 1000, duty_min: 0.0, duty_max: 1.0, resolution_bits: 10}
+matter:
+  endpoint_type: extended_color_light
+  behaviors: [color_control, brightness]

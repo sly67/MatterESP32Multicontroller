@@ -1,0 +1,23 @@
+id: esp32-h2
+name: "ESP32-H2"
+chip: ESP32-H2
+adc_channels: 5
+pwm_channels: 6
+gpio_pins:
+  - {id: GPIO0,  pwm: true}
+  - {id: GPIO1,  pwm: true}
+  - {id: GPIO2,  pwm: true, adc: true}
+  - {id: GPIO3,  pwm: true, adc: true}
+  - {id: GPIO4,  pwm: true, adc: true}
+  - {id: GPIO5,  pwm: true, adc: true}
+  - {id: GPIO8,  pwm: true, i2c: true}
+  - {id: GPIO9,  pwm: true, i2c: true}
+  - {id: GPIO10, pwm: true}
+  - {id: GPIO11, pwm: true}
+  - {id: GPIO12, pwm: true, adc: true}
+  - {id: GPIO22, pwm: true}
+  - {id: GPIO23, pwm: true}
+  - {id: GPIO24, pwm: true}
+  - {id: GPIO25, pwm: true}
+i2c_buses:
+  - {id: I2C0, sda_default: GPIO8, scl_default: GPIO9}

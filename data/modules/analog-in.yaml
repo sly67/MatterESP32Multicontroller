@@ -1,0 +1,18 @@
+id: analog-in
+name: "Analog Input"
+version: "1.0"
+category: io
+io:
+  - id: SIG
+    type: adc_in
+    label: "Signal"
+    constraints:
+      adc:
+        attenuation: 11db
+        resolution_bits: 12
+        sample_rate_hz: 100
+        filter: moving_average
+        filter_samples: 4
+matter:
+  endpoint_type: generic_sensor
+  behaviors: [value_reporting]
