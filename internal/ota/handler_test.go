@@ -64,12 +64,17 @@ func TestOTA_Check_ValidAuth(t *testing.T) {
 	database := newTestDB(t)
 	psk := []byte("testpsk0123456789012345678901234")
 
-	err := database.CreateDevice(db.Device{
+	if err := database.CreateDevice(db.Device{
 		ID: "esp-AABBCC", Name: "test", TemplateID: "tpl-1",
 		FWVersion: "1.0.0", PSK: psk,
-	})
-	if err != nil {
+	}); err != nil {
 		t.Fatalf("create device: %v", err)
+	}
+	if err := database.CreateFirmware(db.FirmwareRow{Version: "1.1.0", Boards: "esp32-c3", IsLatest: true}); err != nil {
+		t.Fatalf("create firmware: %v", err)
+	}
+	if err := database.SetLatestFirmware("1.1.0"); err != nil {
+		t.Fatalf("set latest: %v", err)
 	}
 
 	mux := ota.NewMux(database, t.TempDir())

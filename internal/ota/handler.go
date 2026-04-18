@@ -59,9 +59,7 @@ func handleCheck(database *db.Database) http.HandlerFunc {
 
 		latest, err := database.GetLatestFirmware()
 		if err != nil {
-			log.Printf("ota check: no latest firmware: %v", err)
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(checkResponse{})
+			http.Error(w, "no firmware available", http.StatusServiceUnavailable)
 			return
 		}
 
@@ -97,19 +95,22 @@ func handleDownload(database *db.Database, firmwareDir string) http.HandlerFunc 
 		}
 		defer f.Close()
 
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.bin"`, latest.Version))
+		_, copyErr := io.Copy(w, f)
+
+		result := "ok"
+		if copyErr != nil {
+			log.Printf("ota download: stream device=%s: %v", dev.ID, copyErr)
+			result = "error"
+		}
 		if err := database.CreateOTALog(db.OTALogRow{
 			DeviceID: dev.ID,
 			FromVer:  dev.FWVersion,
 			ToVer:    latest.Version,
-			Result:   "ok",
+			Result:   result,
 		}); err != nil {
 			log.Printf("ota download: log entry: %v", err)
-		}
-
-		w.Header().Set("Content-Type", "application/octet-stream")
-		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.bin"`, latest.Version))
-		if _, err := io.Copy(w, f); err != nil {
-			log.Printf("ota download: stream device=%s: %v", dev.ID, err)
 		}
 	}
 }
