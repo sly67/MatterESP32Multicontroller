@@ -51,6 +51,9 @@ func handleCheck(database *db.Database) http.HandlerFunc {
 		dev := deviceFromContext(r)
 
 		reportedVer := r.Header.Get("X-FW-Version")
+		if len(reportedVer) > 32 {
+			reportedVer = ""
+		}
 		ip := r.RemoteAddr
 
 		if err := database.UpdateDeviceFWVersion(dev.ID, reportedVer, ip); err != nil {
@@ -82,12 +85,11 @@ func handleDownload(database *db.Database, firmwareDir string) http.HandlerFunc 
 			return
 		}
 
-		if strings.ContainsAny(latest.Version, `/\`) {
+		binPath := filepath.Join(firmwareDir, fmt.Sprintf("%s.bin", latest.Version))
+		if !strings.HasPrefix(filepath.Clean(binPath)+string(os.PathSeparator), filepath.Clean(firmwareDir)+string(os.PathSeparator)) {
 			http.Error(w, "invalid firmware version", http.StatusInternalServerError)
 			return
 		}
-
-		binPath := filepath.Join(firmwareDir, fmt.Sprintf("%s.bin", latest.Version))
 		f, err := os.Open(binPath)
 		if err != nil {
 			http.Error(w, "firmware file not found", http.StatusNotFound)

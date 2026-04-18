@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
@@ -180,5 +182,57 @@ func TestOTA_Download_FileNotFound(t *testing.T) {
 
 	if w.Code != http.StatusNotFound {
 		t.Errorf("want 404 for missing bin, got %d", w.Code)
+	}
+}
+
+func TestOTA_Download_Success(t *testing.T) {
+	database := newTestDB(t)
+	psk := []byte("testpsk0123456789012345678901234")
+
+	if err := database.CreateDevice(db.Device{
+		ID: "esp-AABBCC", Name: "test", TemplateID: "tpl-1", FWVersion: "1.0.0", PSK: psk,
+	}); err != nil {
+		t.Fatalf("create device: %v", err)
+	}
+	if err := database.CreateFirmware(db.FirmwareRow{Version: "1.1.0", Boards: "esp32-c3", IsLatest: true}); err != nil {
+		t.Fatalf("create firmware: %v", err)
+	}
+	if err := database.SetLatestFirmware("1.1.0"); err != nil {
+		t.Fatalf("set latest: %v", err)
+	}
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "1.1.0.bin"), []byte("fake-firmware"), 0600); err != nil {
+		t.Fatalf("write bin: %v", err)
+	}
+
+	mux := ota.NewMux(database, dir)
+	req := signedRequest(t, http.MethodGet, "/ota/download", psk, "esp-AABBCC")
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("want 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if ct := w.Header().Get("Content-Type"); ct != "application/octet-stream" {
+		t.Errorf("want octet-stream Content-Type, got %q", ct)
+	}
+	if w.Body.String() != "fake-firmware" {
+		t.Errorf("want body 'fake-firmware', got %q", w.Body.String())
+	}
+
+	// Verify OTA log was written
+	rows, err := database.ListOTALogForDevice("esp-AABBCC")
+	if err != nil {
+		t.Fatalf("list ota log: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("want 1 ota log row, got %d", len(rows))
+	}
+	if rows[0].Result != "ok" {
+		t.Errorf("want result='ok', got %q", rows[0].Result)
+	}
+	if rows[0].FromVer != "1.0.0" || rows[0].ToVer != "1.1.0" {
+		t.Errorf("want from=1.0.0 to=1.1.0, got from=%q to=%q", rows[0].FromVer, rows[0].ToVer)
 	}
 }

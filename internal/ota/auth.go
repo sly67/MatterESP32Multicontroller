@@ -23,6 +23,8 @@ func deviceFromContext(r *http.Request) db.Device {
 
 const timestampTolerance = 5 * time.Minute
 
+// signatureMessage builds the string signed by the device PSK.
+// Path only (no query string) — current OTA endpoints use no query parameters.
 func signatureMessage(method, path, ts string) string {
 	return strings.ToUpper(method) + ":" + path + ":" + ts
 }

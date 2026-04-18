@@ -8,6 +8,8 @@ import (
 	"github.com/karthangar/matteresp32hub/internal/db"
 )
 
+// otaRouter registers OTA log endpoints under /api/ota.
+// Auth is handled at the Traefik layer — these routes are not directly internet-exposed.
 func otaRouter(database *db.Database) func(chi.Router) {
 	return func(r chi.Router) {
 		r.Get("/log/{deviceID}", func(w http.ResponseWriter, req *http.Request) {
