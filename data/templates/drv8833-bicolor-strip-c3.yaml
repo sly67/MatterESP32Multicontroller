@@ -1,0 +1,11 @@
+id: drv8833-bicolor-strip-c3
+board: esp32-c3
+modules:
+  - module: drv8833
+    endpoint_name: "Bicolor LED Strip"
+    pins:
+      AIN1: GPIO0
+      AIN2: GPIO1
+    params:
+      channel_mode: A_only
+      decay_mode: fast

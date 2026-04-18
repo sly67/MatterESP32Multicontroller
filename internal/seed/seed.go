@@ -34,6 +34,25 @@ func SeedBuiltins(database *db.Database) error {
 		}
 	}
 
+	tpls, err := library.LoadTemplates()
+	if err != nil {
+		return fmt.Errorf("load built-in templates: %w", err)
+	}
+	for _, t := range tpls {
+		body, err := yaml.Marshal(t)
+		if err != nil {
+			return fmt.Errorf("marshal template %q: %w", t.ID, err)
+		}
+		if err := database.CreateTemplate(db.TemplateRow{
+			ID:       t.ID,
+			Name:     t.ID,
+			Board:    t.Board,
+			YAMLBody: string(body),
+		}); err != nil {
+			return fmt.Errorf("seed template %q: %w", t.ID, err)
+		}
+	}
+
 	effs, err := library.LoadEffects()
 	if err != nil {
 		return fmt.Errorf("load built-in effects: %w", err)

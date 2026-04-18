@@ -13,3 +13,6 @@ var EffectsFS embed.FS
 
 //go:embed all:boards
 var BoardsFS embed.FS
+
+//go:embed all:templates
+var TemplatesFS embed.FS

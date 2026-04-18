@@ -26,6 +26,11 @@ func LoadBoards() ([]*yamldef.BoardProfile, error) {
 	return loadDir(data.BoardsFS, "boards", yamldef.ParseBoard)
 }
 
+// LoadTemplates parses and returns all built-in template definitions.
+func LoadTemplates() ([]*yamldef.Template, error) {
+	return loadDir(data.TemplatesFS, "templates", yamldef.ParseTemplate)
+}
+
 func loadDir[T any](fsys fs.ReadDirFS, dir string, parse func([]byte) (*T, error)) ([]*T, error) {
 	entries, err := fsys.ReadDir(dir)
 	if err != nil {
