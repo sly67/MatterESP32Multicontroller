@@ -28,6 +28,19 @@ func newTestServer(t *testing.T) http.Handler {
 	return api.NewRouter(cfg, database)
 }
 
+func newTestServerWithDataDir(t *testing.T, dataDir string) http.Handler {
+	t.Helper()
+	database, err := db.Open(":memory:")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		delete(testDBs, t)
+		database.Close()
+	})
+	testDBs[t] = database
+	cfg := &config.Config{WebPort: 48060, OTAPort: 48061, DataDir: dataDir}
+	return api.NewRouter(cfg, database)
+}
+
 func getDatabase(t *testing.T, _ http.Handler) *db.Database {
 	t.Helper()
 	d, ok := testDBs[t]

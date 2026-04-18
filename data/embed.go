@@ -16,3 +16,6 @@ var BoardsFS embed.FS
 
 //go:embed all:templates
 var TemplatesFS embed.FS
+
+//go:embed all:flash
+var FlashFS embed.FS
