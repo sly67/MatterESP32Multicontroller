@@ -1,9 +1,9 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { api } from '../lib/api.js';
 
   // ── Tab ────────────────────────────────────────────────────────────────────
-  let activeTab = 'server'; // 'server' | 'browser'
+  let activeTab = 'server'; // 'server' | 'browser' | 'debug'
 
   // ── Browser Flash ──────────────────────────────────────────────────────────
   import 'esp-web-tools';
@@ -102,6 +102,110 @@
       browserFlashMsg = e.detail?.details || 'Writing firmware…';
     }
   }
+
+  // ── Serial Debug ───────────────────────────────────────────────────────────
+  const BAUD_RATES = [74880, 115200, 921600];
+  const LOG_MAX_LINES = 1000;
+
+  let dbgStatus = 'disconnected'; // 'disconnected' | 'connecting' | 'connected' | 'error'
+  let dbgError  = '';
+  let dbgPort   = null;
+  let dbgAbort  = null;
+  let dbgPipeDone = null;
+  let logLines  = [];
+  let selectedBaud = 115200;
+  let autoScroll = true;
+  let inputLine = '';
+  let logContainer;
+  let serialSupported = typeof navigator !== 'undefined' && 'serial' in navigator;
+
+  const STATUS_LABEL = { disconnected: 'Disconnected', connecting: 'Connecting…', connected: 'Connected', error: 'Error' };
+  const STATUS_BADGE = { disconnected: 'badge-ghost', connecting: 'badge-warning', connected: 'badge-success', error: 'badge-error' };
+
+  class LineBreakTransformer {
+    constructor() { this.buffer = ''; }
+    transform(chunk, controller) {
+      this.buffer += chunk;
+      const lines = this.buffer.split(/\r?\n/);
+      this.buffer = lines.pop();
+      for (const line of lines) controller.enqueue(line);
+    }
+    flush(controller) {
+      if (this.buffer) controller.enqueue(this.buffer);
+    }
+  }
+
+  async function appendLines(newLines) {
+    logLines = [...logLines, ...newLines].slice(-LOG_MAX_LINES);
+    if (autoScroll) {
+      await tick();
+      if (logContainer) logContainer.scrollTop = logContainer.scrollHeight;
+    }
+  }
+
+  async function connect() {
+    dbgError = '';
+    dbgStatus = 'connecting';
+    try {
+      dbgPort = await navigator.serial.requestPort();
+    } catch (_) {
+      dbgStatus = 'disconnected'; // user cancelled picker
+      return;
+    }
+    try {
+      await dbgPort.open({ baudRate: selectedBaud });
+      dbgStatus = 'connected';
+      startReading();
+    } catch (e) {
+      dbgStatus = 'error';
+      dbgError = e.message;
+      dbgPort = null;
+    }
+  }
+
+  function startReading() {
+    dbgAbort = new AbortController();
+    dbgPipeDone = dbgPort.readable
+      .pipeThrough(new TextDecoderStream(), { signal: dbgAbort.signal })
+      .pipeThrough(new TransformStream(new LineBreakTransformer()))
+      .pipeTo(new WritableStream({
+        write(line) { return appendLines([line]); }
+      }))
+      .catch(async e => {
+        if (e.name !== 'AbortError') {
+          dbgError = e.message;
+          dbgStatus = 'error';
+          try { await dbgPort?.close(); } catch (_) {}
+          dbgPort = null;
+        }
+      });
+  }
+
+  async function disconnect() {
+    if (dbgAbort) { dbgAbort.abort(); dbgAbort = null; }
+    if (dbgPipeDone) { await dbgPipeDone; dbgPipeDone = null; }
+    try { await dbgPort.close(); } catch (_) {}
+    dbgPort = null;
+    dbgStatus = 'disconnected';
+  }
+
+  async function sendLine() {
+    if (!dbgPort || dbgStatus !== 'connected' || !inputLine.trim()) return;
+    const encoder = new TextEncoder();
+    let writer;
+    try {
+      writer = dbgPort.writable.getWriter();
+      await writer.write(encoder.encode(inputLine + '\r\n'));
+    } catch (e) {
+      dbgError = e.message;
+    } finally {
+      try { writer?.releaseLock(); } catch (_) {}
+    }
+    appendLines(['> ' + inputLine]);
+    inputLine = '';
+  }
+
+  function clearLog() { logLines = []; }
 </script>
 
 <div class="p-6 flex flex-col gap-4 max-w-2xl">
@@ -116,6 +220,10 @@
     <button role="tab" class="tab {activeTab === 'browser' ? 'tab-active' : ''}"
       on:click={() => activeTab = 'browser'}>
       Browser Flash <span class="ml-1 text-xs text-base-content/40">(ESP32 on your USB)</span>
+    </button>
+    <button role="tab" class="tab {activeTab === 'debug' ? 'tab-active' : ''}"
+      on:click={() => activeTab = 'debug'}>
+      Serial Debug <span class="ml-1 text-xs text-base-content/40">(USB logs)</span>
     </button>
   </div>
 
@@ -143,6 +251,11 @@
           <div class="alert alert-success text-sm">
             Flash complete! The device will reboot into the Matter hub firmware.
             Use the <strong>Server Flash</strong> tab to provision it with WiFi and device credentials.
+          </div>
+          <div class="alert alert-info text-xs mt-1">
+            Unplug and replug the ESP32, then open the
+            <button class="link link-primary font-semibold" on:click={() => activeTab = 'debug'}>Serial Debug</button>
+            tab to view boot logs.
           </div>
           <button class="btn btn-ghost btn-sm self-start"
             on:click={() => { browserFlashState = 'idle'; browserFlashMsg = ''; }}>
@@ -180,6 +293,63 @@
             </span>
           </esp-web-install-button>
         {/if}
+      {/if}
+    </div>
+  {/if}
+
+  <!-- ── Serial Debug ───────────────────────────────────────────────────────── -->
+  {#if activeTab === 'debug'}
+    <div class="flex flex-col gap-4">
+      {#if !serialSupported}
+        <div class="alert alert-error text-sm">Web Serial API not supported — use Chrome or Edge.</div>
+      {:else}
+        <div class="flex flex-wrap items-center gap-2">
+          <select class="select select-bordered select-xs" bind:value={selectedBaud}
+            disabled={dbgStatus !== 'disconnected'}>
+            {#each BAUD_RATES as baud}<option value={baud}>{baud}</option>{/each}
+          </select>
+
+          {#if dbgStatus === 'disconnected' || dbgStatus === 'error'}
+            <button class="btn btn-primary btn-sm" on:click={connect}>Connect</button>
+          {:else if dbgStatus === 'connecting'}
+            <button class="btn btn-primary btn-sm" disabled>
+              <span class="loading loading-spinner loading-xs"></span> Connecting…
+            </button>
+          {:else}
+            <button class="btn btn-error btn-sm" on:click={disconnect}>Disconnect</button>
+          {/if}
+
+          <button class="btn btn-ghost btn-sm" on:click={clearLog} disabled={logLines.length === 0}>Clear</button>
+          <label class="flex items-center gap-1 text-xs cursor-pointer select-none">
+            <input type="checkbox" class="checkbox checkbox-xs" bind:checked={autoScroll} />
+            Auto-scroll
+          </label>
+          <span class="badge {STATUS_BADGE[dbgStatus]} badge-sm ml-auto">{STATUS_LABEL[dbgStatus]}</span>
+        </div>
+
+        {#if dbgStatus === 'error' && dbgError}
+          <div class="alert alert-error text-xs">{dbgError}</div>
+        {/if}
+
+        <pre bind:this={logContainer}
+          class="bg-neutral text-neutral-content font-mono text-xs rounded-lg border border-base-300
+                 overflow-y-auto h-80 p-3 leading-relaxed whitespace-pre-wrap break-all"
+        >{#if logLines.length === 0}<span class="text-base-content/30 italic">No output — connect to see logs.</span
+        >{:else}{#each logLines as line}{line + '\n'}{/each}{/if}</pre>
+
+        {#if dbgStatus === 'connected'}
+          <form class="flex gap-2" on:submit|preventDefault={sendLine}>
+            <input class="input input-bordered input-sm flex-1 font-mono text-xs"
+              placeholder="Send command (Enter)…"
+              bind:value={inputLine}
+              autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+            <button type="submit" class="btn btn-sm btn-ghost">Send</button>
+          </form>
+        {/if}
+
+        <p class="text-xs text-base-content/40">
+          Chrome / Edge only. 115200 for ESP32 logs; 74880 for early boot ROM output.
+        </p>
       {/if}
     </div>
   {/if}
