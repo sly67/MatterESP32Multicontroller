@@ -31,7 +31,8 @@ func listModules(database *db.Database) http.HandlerFunc {
 
 		type moduleResp struct {
 			db.ModuleRow
-			HasESPHome bool `json:"has_esphome"`
+			HasESPHome bool             `json:"has_esphome"`
+			IO         []yamldef.IOPin  `json:"io,omitempty"`
 		}
 		var results []moduleResp
 		for _, m := range mods {
@@ -40,7 +41,11 @@ func listModules(database *db.Database) http.HandlerFunc {
 			if esphomeOnly && !hasESPHome {
 				continue
 			}
-			results = append(results, moduleResp{ModuleRow: m, HasESPHome: hasESPHome})
+			var io []yamldef.IOPin
+			if parseErr == nil {
+				io = mod.IO
+			}
+			results = append(results, moduleResp{ModuleRow: m, HasESPHome: hasESPHome, IO: io})
 		}
 		if results == nil {
 			results = []moduleResp{}
