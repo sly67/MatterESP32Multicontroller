@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestLoadModules_ReturnsFive(t *testing.T) {
+func TestLoadModules_ReturnsAll(t *testing.T) {
 	mods, err := library.LoadModules()
 	require.NoError(t, err)
-	assert.Len(t, mods, 5)
+	assert.Len(t, mods, 9)
 	ids := make(map[string]bool)
 	for _, m := range mods {
 		ids[m.ID] = true
@@ -21,6 +21,10 @@ func TestLoadModules_ReturnsFive(t *testing.T) {
 	assert.True(t, ids["bh1750"])
 	assert.True(t, ids["analog-in"])
 	assert.True(t, ids["gpio-switch"])
+	assert.True(t, ids["dht22"])
+	assert.True(t, ids["bme280"])
+	assert.True(t, ids["neopixel"])
+	assert.True(t, ids["binary-input"])
 }
 
 func TestLoadEffects_ReturnsTwo(t *testing.T) {
