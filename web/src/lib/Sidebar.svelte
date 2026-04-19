@@ -8,6 +8,7 @@
     { section: 'Configuration' },
     { id: 'templates', label: 'Templates',      icon: '⚙' },
     { id: 'modules',   label: 'Module Library', icon: '⬡' },
+    { id: 'effects',   label: 'Effects',        icon: '✦' },
     { section: 'Updates' },
     { id: 'ota',       label: 'OTA Updates',    icon: '⇅' },
     { id: 'firmware',  label: 'Firmware',       icon: '💾' },

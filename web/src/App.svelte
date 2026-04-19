@@ -4,13 +4,14 @@
   import Flash     from './views/Flash.svelte';
   import Templates from './views/Templates.svelte';
   import Modules   from './views/Modules.svelte';
+  import Effects   from './views/Effects.svelte';
   import OTA       from './views/OTA.svelte';
   import Firmware  from './views/Firmware.svelte';
   import Settings  from './views/Settings.svelte';
 
   let current = 'fleet';
 
-  const views = { Fleet, Flash, Templates, Modules, OTA, Firmware, Settings };
+  const views = { Fleet, Flash, Templates, Modules, Effects, OTA, Firmware, Settings };
   $: ViewComponent = views[current.charAt(0).toUpperCase() + current.slice(1)];
 </script>
 
