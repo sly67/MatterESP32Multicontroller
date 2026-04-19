@@ -11,8 +11,14 @@ import (
 func TestSetupQRPayload_Format(t *testing.T) {
 	payload := matter.SetupQRPayload(3840, 20202021)
 	assert.True(t, strings.HasPrefix(payload, "MT:"), "must start with MT:")
-	// 3 prefix chars + 11 Base38 chars (7 bytes: 3 pairs × 3 chars + 1 byte × 2 chars) = 14 total
-	assert.Equal(t, 14, len(payload), "MT: payload must be 14 chars")
+	// 3 prefix + 19 Base38 chars = 22 total (11-byte payload, 3-byte chunked)
+	assert.Equal(t, 22, len(payload), "MT: payload must be 22 chars (3 prefix + 19 Base38)")
+}
+
+func TestSetupQRPayload_KnownVector(t *testing.T) {
+	// discriminator=3840, passcode=20202021, VID=0xFFF1, PID=0x8000, BLE rendezvous
+	// Independently computed from the 88-bit spec layout.
+	assert.Equal(t, "MT:Y.K9042C00KA0648G00", matter.SetupQRPayload(3840, 20202021))
 }
 
 func TestSetupQRPayload_Deterministic(t *testing.T) {
