@@ -19,6 +19,11 @@ func Compile(tpl *yamldef.Template, dev DeviceConfig) (string, error) {
 	}
 
 	var b strings.Builder
+	// csvQuote wraps val in double-quotes and escapes internal double-quotes so the
+	// value is safe even when it contains commas, quotes, or newlines.
+	csvQuote := func(val string) string {
+		return `"` + strings.ReplaceAll(val, `"`, `""`) + `"`
+	}
 	row := func(key, typ, enc, val string) {
 		b.WriteString(key)
 		b.WriteByte(',')
@@ -26,10 +31,13 @@ func Compile(tpl *yamldef.Template, dev DeviceConfig) (string, error) {
 		b.WriteByte(',')
 		b.WriteString(enc)
 		b.WriteByte(',')
-		b.WriteString(val)
+		b.WriteString(csvQuote(val))
 		b.WriteByte('\n')
 	}
-	ns := func(name string) { row(name, "namespace", "", "") }
+	// Namespace rows must have empty encoding and value — don't quote them.
+	ns := func(name string) {
+		b.WriteString(name + ",namespace,,\n")
+	}
 
 	b.WriteString("key,type,encoding,value\n")
 
