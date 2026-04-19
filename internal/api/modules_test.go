@@ -64,3 +64,59 @@ func TestModules_GetMissing(t *testing.T) {
 	srv.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusNotFound, w.Code)
 }
+
+func TestModules_ESPHomeFilter(t *testing.T) {
+	srv := newTestServer(t)
+	database := getDatabase(t, srv)
+
+	require.NoError(t, database.CreateModule(db.ModuleRow{
+		ID: "dht22-test", Name: "DHT22", Category: "sensor",
+		YAMLBody: `id: dht22-test
+name: "DHT22"
+version: "1.0"
+category: sensor
+io:
+  - id: DATA
+    type: digital_out
+    label: "Data"
+    constraints:
+      digital: {active: high, initial_state: low}
+matter:
+  endpoint_type: temperature_sensor
+  behaviors: [temperature_reporting]
+esphome:
+  components:
+    - domain: sensor
+      template: "platform: dht"
+`,
+	}))
+
+	require.NoError(t, database.CreateModule(db.ModuleRow{
+		ID: "no-esphome-test", Name: "No ESPHome", Category: "io",
+		YAMLBody: `id: no-esphome-test
+name: "No ESPHome"
+version: "1.0"
+category: io
+io:
+  - id: OUT
+    type: digital_out
+    label: "Out"
+    constraints:
+      digital: {active: high, initial_state: low}
+matter:
+  endpoint_type: on_off_light
+  behaviors: [on_off]
+`,
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/modules?esphome=true", nil)
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var mods []map[string]interface{}
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&mods))
+	require.Len(t, mods, 1, "only ESPHome-capable modules returned")
+	assert.True(t, mods[0]["has_esphome"].(bool))
+	assert.Equal(t, "dht22-test", mods[0]["id"])
+}

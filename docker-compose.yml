@@ -16,6 +16,13 @@ services:
       - /Portainer/MatterESP32/certs:/data/certs
       - /Portainer/MatterESP32/matter:/data/matter
       - /dev:/dev  # exposes host /dev so plugged-in ttyUSB/ttyACM nodes are visible
+      # Firmware builder — required only if using the Build button in the web UI.
+      # rsync the firmware/ directory here before triggering a build.
+      - /Portainer/MatterESP32/firmware-src:/firmware-src:ro
+      # Docker socket gives the hub access to the host Docker daemon so it can
+      # run the firmware builder image. Only needed for the Build feature.
+      - /var/run/docker.sock:/var/run/docker.sock
+      - esphome-cache:/data/esphome-cache
     # Dynamic USB serial access — devices appear automatically when plugged in,
     # no container restart needed. cgroup rules grant access by device class:
     #   188 = ttyUSB (CH340, CP210x, FTDI…)
@@ -25,3 +32,7 @@ services:
       - 'c 166:* rmw'
     environment:
       - DATA_DIR=/data
+      - FIRMWARE_SRC_DIR=/firmware-src
+
+volumes:
+  esphome-cache:

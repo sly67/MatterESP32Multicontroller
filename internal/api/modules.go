@@ -22,16 +22,31 @@ func modulesRouter(database *db.Database) func(chi.Router) {
 
 func listModules(database *db.Database) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		esphomeOnly := r.URL.Query().Get("esphome") == "true"
 		mods, err := database.ListModules()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		if mods == nil {
-			mods = []db.ModuleRow{}
+
+		type moduleResp struct {
+			db.ModuleRow
+			HasESPHome bool `json:"has_esphome"`
+		}
+		var results []moduleResp
+		for _, m := range mods {
+			mod, parseErr := yamldef.ParseModule([]byte(m.YAMLBody))
+			hasESPHome := parseErr == nil && mod.ESPHome != nil
+			if esphomeOnly && !hasESPHome {
+				continue
+			}
+			results = append(results, moduleResp{ModuleRow: m, HasESPHome: hasESPHome})
+		}
+		if results == nil {
+			results = []moduleResp{}
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(mods)
+		json.NewEncoder(w).Encode(results)
 	}
 }
 
