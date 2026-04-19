@@ -11,7 +11,7 @@ import (
 )
 
 func TestBuilder_New(t *testing.T) {
-	b, err := esphome.NewBuilder("/tmp/esphome-test-cache")
+	b, err := esphome.NewBuilder("/tmp/esphome-test-cache", "")
 	require.NoError(t, err)
 	assert.NotNil(t, b)
 	b.Close()
@@ -24,7 +24,7 @@ func TestBuilder_Compile_Integration(t *testing.T) {
 	if _, err := os.Stat("/var/run/docker.sock"); os.IsNotExist(err) {
 		t.Skip("Docker socket not available")
 	}
-	b, err := esphome.NewBuilder(t.TempDir())
+	b, err := esphome.NewBuilder(t.TempDir(), "")
 	require.NoError(t, err)
 	defer b.Close()
 

@@ -14,15 +14,23 @@ const compileTimeout = 15 * time.Minute
 
 // Builder compiles ESPHome YAML into firmware binaries using a one-shot Docker container.
 type Builder struct {
-	cacheDir string
+	cacheDir  string
+	volumeRef string // Docker volume name or host path for the -v bind; equals cacheDir when empty
 }
 
 // NewBuilder creates a Builder that will use cacheDir for ESPHome build artifacts.
-func NewBuilder(cacheDir string) (*Builder, error) {
+// volumeRef is the Docker volume source for the bind mount into the ESPHome container.
+// Pass a named volume (e.g. "esphome-cache") when the server itself runs inside Docker so
+// that both containers share the same volume rather than a container-internal path.
+// If volumeRef is empty, cacheDir is used as the bind mount source (suitable for local dev).
+func NewBuilder(cacheDir, volumeRef string) (*Builder, error) {
 	if err := os.MkdirAll(cacheDir, 0755); err != nil {
 		return nil, fmt.Errorf("create cache dir: %w", err)
 	}
-	return &Builder{cacheDir: cacheDir}, nil
+	if volumeRef == "" {
+		volumeRef = cacheDir
+	}
+	return &Builder{cacheDir: cacheDir, volumeRef: volumeRef}, nil
 }
 
 // Close is a no-op (kept for API symmetry).
@@ -35,7 +43,7 @@ func (b *Builder) Compile(ctx context.Context, deviceName string, yaml string, l
 	ctx, cancel := context.WithTimeout(ctx, compileTimeout)
 	defer cancel()
 
-	devDir := filepath.Join(b.cacheDir, deviceName)
+	devDir := filepath.Join(b.cacheDir, slug(deviceName))
 	if err := os.MkdirAll(devDir, 0755); err != nil {
 		return nil, fmt.Errorf("create device dir: %w", err)
 	}
@@ -45,12 +53,14 @@ func (b *Builder) Compile(ctx context.Context, deviceName string, yaml string, l
 		return nil, fmt.Errorf("write config: %w", err)
 	}
 
+	deviceSlug := slug(deviceName)
+
 	cmd := exec.CommandContext(ctx,
 		"docker", "run", "--rm",
-		"-v", b.cacheDir+":/config",
+		"-v", b.volumeRef+":/config",
 		"ghcr.io/esphome/esphome:latest",
 		"compile",
-		"/config/"+deviceName+"/config.yaml",
+		"/config/"+deviceSlug+"/config.yaml",
 	)
 	cmd.Stdout = logWriter
 	cmd.Stderr = logWriter
@@ -59,7 +69,7 @@ func (b *Builder) Compile(ctx context.Context, deviceName string, yaml string, l
 		return nil, fmt.Errorf("esphome compile: %w", err)
 	}
 
-	binPath := filepath.Join(devDir, ".esphome", "build", deviceName, ".pioenvs", deviceName, "firmware-factory.bin")
+	binPath := filepath.Join(devDir, ".esphome", "build", deviceSlug, ".pioenvs", deviceSlug, "firmware-factory.bin")
 	bin, err := os.ReadFile(binPath)
 	if err != nil {
 		return nil, fmt.Errorf("read firmware binary (%s): %w", binPath, err)

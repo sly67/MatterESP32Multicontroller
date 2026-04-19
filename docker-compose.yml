@@ -33,6 +33,7 @@ services:
     environment:
       - DATA_DIR=/data
       - FIRMWARE_SRC_DIR=/firmware-src
+      - ESPHOME_CACHE_VOLUME=esphome-cache
 
 volumes:
   esphome-cache:
