@@ -13,6 +13,10 @@ Allow a device to be flashed with either Matter firmware (existing path) or ESPH
 
 The firmware type is chosen at flash time. The existing module library is the single source of truth for both Matter and ESPHome devices — each module definition gains an `esphome:` block alongside its existing Matter configuration. The Flash wizard forks at step 1 (Matter vs ESPHome); the ESPHome path reuses the existing module+GPIO assignment UI. Effects remain attached to modules and can be extended with ESPHome automation equivalents in the future without changing the assembler.
 
+**Device registration is two-phase:**
+1. **Initial registration via USB** — at flash time the hub reads the chip ID (MAC) via USB and registers the device in the DB, identical to the Matter path. This is the source of truth for device identity.
+2. **Ongoing status via HTTP heartbeat** — the assembled ESPHome YAML includes an `interval:` + `http_request:` block that calls `POST /api/devices/{id}/heartbeat` every 60 seconds. The hub updates `status`, `ip`, and `last_seen` on each call. The hub URL is embedded in the ESPHome config at compile time.
+
 **Tech Stack:** Go (Docker SDK, chi, modernc SQLite), Svelte 4, DaisyUI, `ghcr.io/esphome/esphome` Docker image
 
 ---
@@ -36,6 +40,7 @@ Existing Matter devices are unaffected — `firmware_type` defaults to `matter`,
   "board": "esp32-c3",
   "ha_integration": true,
   "ota_password": "hex...",
+  "hub_url": "http://192.168.1.10:8080",
   "components": [
     { "type": "dht22",  "name": "Room Temp", "pins": {"DATA": "GPIO4"} },
     { "type": "relay",  "name": "Relay 1",   "pins": {"PIN":  "GPIO5"} },
@@ -189,11 +194,13 @@ type ComponentConfig struct {
 type Config struct {
     Board         string
     DeviceName    string
+    DeviceID      string // chip MAC, used in heartbeat URL
     WiFiSSID      string
     WiFiPassword  string
     HAIntegration bool
     APIKey        string // 32-byte hex, required if HAIntegration == true
     OTAPassword   string // random, generated at flash time
+    HubURL        string // e.g. "http://192.168.1.10:8080" — embedded in heartbeat component
     Components    []ComponentConfig
 }
 
@@ -207,7 +214,18 @@ The assembler produces:
 3. `logger:` block
 4. `ota:` block (with generated password)
 5. `api:` block (with encryption key if HA mode; omitted if standalone)
-6. Per-component blocks (pin + name substituted from module's `esphome.components`)
+6. `http_request:` + `interval:` block for fleet heartbeat:
+```yaml
+http_request:
+  useragent: MatterHub-ESPHome/1.0
+
+interval:
+  - interval: 60s
+    then:
+      - http_request.post:
+          url: "{HUB_URL}/api/devices/{DEVICE_ID}/heartbeat"
+```
+7. Per-component blocks (pin + name substituted from module's `esphome.components`)
 
 ---
 
@@ -289,6 +307,7 @@ Server-flash ESPHome path. Accepts:
   "wifi_password": "secret",
   "ha_integration": true,
   "board": "esp32-c3",
+  "hub_url": "http://192.168.1.10:8080",
   "components": [
     { "type": "dht22", "name": "Kitchen Temp", "pins": {"DATA": "GPIO4"} }
   ]
@@ -296,6 +315,14 @@ Server-flash ESPHome path. Accepts:
 ```
 
 Streams build log lines as newline-delimited JSON (`{"log": "..."}`) via chunked response, then returns final result.
+
+### `POST /api/devices/{id}/heartbeat`
+Called by the ESPHome device every 60s after boot. No authentication — the device ID in the URL identifies the device; the request IP is used to update the fleet entry.
+
+- Returns `204 No Content` on success
+- Returns `404` if device ID not found or `firmware_type != "esphome"`
+- Updates: `status = 'online'`, `ip = request remote IP`, `last_seen = now()`
+- Hub marks a device `offline` after 3 missed heartbeats (180s with no call)
 
 ---
 
