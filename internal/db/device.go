@@ -4,39 +4,54 @@ import "time"
 
 // Device represents a registered ESP32 device.
 type Device struct {
-	ID         string     `json:"id"`
-	Name       string     `json:"name"`
-	TemplateID string     `json:"template_id"`
-	FWVersion  string     `json:"fw_version"`
-	PSK            []byte     `json:"-"` // never expose in API responses
+	ID             string     `json:"id"`
+	Name           string     `json:"name"`
+	TemplateID     string     `json:"template_id"`
+	FWVersion      string     `json:"fw_version"`
+	PSK            []byte     `json:"-"`
 	Status         string     `json:"status"`
 	LastSeen       *time.Time `json:"last_seen"`
 	IP             string     `json:"ip"`
-	MatterDiscrim  uint16     `json:"-"` // commissioning only — never in list/get JSON responses
-	MatterPasscode uint32     `json:"-"` // commissioning only — never in list/get JSON responses
+	MatterDiscrim  uint16     `json:"-"`
+	MatterPasscode uint32     `json:"-"`
+	FirmwareType   string     `json:"firmware_type"`
+	ESPHomeConfig  string     `json:"-"`
+	ESPHomeAPIKey  string     `json:"-"`
 	CreatedAt      time.Time  `json:"created_at"`
 }
 
 // CreateDevice inserts a new device record.
 func (d *Database) CreateDevice(dev Device) error {
+	ft := dev.FirmwareType
+	if ft == "" {
+		ft = "matter"
+	}
+	var templateID interface{}
+	if dev.TemplateID != "" {
+		templateID = dev.TemplateID
+	}
 	_, err := d.DB.Exec(
-		`INSERT INTO devices (id, name, template_id, fw_version, psk, status, matter_discrim, matter_passcode)
-		 VALUES (?, ?, ?, ?, ?, 'unknown', ?, ?)`,
-		dev.ID, dev.Name, dev.TemplateID, dev.FWVersion, dev.PSK, dev.MatterDiscrim, dev.MatterPasscode)
+		`INSERT INTO devices (id, name, template_id, fw_version, psk, status,
+		        matter_discrim, matter_passcode, firmware_type, esphome_config, esphome_api_key)
+		 VALUES (?, ?, ?, ?, ?, 'unknown', ?, ?, ?, ?, ?)`,
+		dev.ID, dev.Name, templateID, dev.FWVersion, dev.PSK,
+		dev.MatterDiscrim, dev.MatterPasscode,
+		ft, dev.ESPHomeConfig, dev.ESPHomeAPIKey)
 	return err
 }
 
 // GetDevice retrieves a device by ID.
 func (d *Database) GetDevice(id string) (Device, error) {
 	row := d.DB.QueryRow(
-		`SELECT id, name, template_id, fw_version, psk, status, last_seen, ip,
-		        matter_discrim, matter_passcode, created_at
+		`SELECT id, name, COALESCE(template_id,''), fw_version, psk, status, last_seen, ip,
+		        matter_discrim, matter_passcode, firmware_type, esphome_config, esphome_api_key, created_at
 		 FROM devices WHERE id = ?`, id)
 	var dev Device
 	var lastSeen *time.Time
 	if err := row.Scan(&dev.ID, &dev.Name, &dev.TemplateID, &dev.FWVersion,
 		&dev.PSK, &dev.Status, &lastSeen, &dev.IP,
-		&dev.MatterDiscrim, &dev.MatterPasscode, &dev.CreatedAt); err != nil {
+		&dev.MatterDiscrim, &dev.MatterPasscode,
+		&dev.FirmwareType, &dev.ESPHomeConfig, &dev.ESPHomeAPIKey, &dev.CreatedAt); err != nil {
 		return Device{}, err
 	}
 	dev.LastSeen = lastSeen
@@ -46,8 +61,8 @@ func (d *Database) GetDevice(id string) (Device, error) {
 // ListDevices returns all devices ordered by name.
 func (d *Database) ListDevices() ([]Device, error) {
 	rows, err := d.DB.Query(
-		`SELECT id, name, template_id, fw_version, psk, status, last_seen, ip,
-		        matter_discrim, matter_passcode, created_at
+		`SELECT id, name, COALESCE(template_id,''), fw_version, psk, status, last_seen, ip,
+		        matter_discrim, matter_passcode, firmware_type, esphome_config, esphome_api_key, created_at
 		 FROM devices ORDER BY name`)
 	if err != nil {
 		return nil, err
@@ -59,7 +74,8 @@ func (d *Database) ListDevices() ([]Device, error) {
 		var lastSeen *time.Time
 		if err := rows.Scan(&dev.ID, &dev.Name, &dev.TemplateID, &dev.FWVersion,
 			&dev.PSK, &dev.Status, &lastSeen, &dev.IP,
-			&dev.MatterDiscrim, &dev.MatterPasscode, &dev.CreatedAt); err != nil {
+			&dev.MatterDiscrim, &dev.MatterPasscode,
+			&dev.FirmwareType, &dev.ESPHomeConfig, &dev.ESPHomeAPIKey, &dev.CreatedAt); err != nil {
 			return nil, err
 		}
 		dev.LastSeen = lastSeen

@@ -47,6 +47,45 @@ func Open(path string) (*Database, error) {
 	} {
 		sqldb.Exec(up) //nolint:errcheck // column may already exist on new installs
 	}
+
+	// ESPHome migration: make template_id nullable + add ESPHome columns.
+	// Detect by checking whether firmware_type column exists.
+	var fwTypeCount int
+	sqldb.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('devices') WHERE name='firmware_type'`).Scan(&fwTypeCount) //nolint:errcheck
+	if fwTypeCount == 0 {
+		stmts := []string{
+			`PRAGMA foreign_keys=OFF`,
+			`CREATE TABLE devices_v2 (
+				id              TEXT PRIMARY KEY,
+				name            TEXT NOT NULL,
+				template_id     TEXT,
+				fw_version      TEXT NOT NULL DEFAULT '',
+				psk             BLOB NOT NULL DEFAULT x'',
+				status          TEXT NOT NULL DEFAULT 'unknown',
+				last_seen       DATETIME,
+				ip              TEXT NOT NULL DEFAULT '',
+				matter_discrim  INTEGER NOT NULL DEFAULT 0,
+				matter_passcode INTEGER NOT NULL DEFAULT 0,
+				firmware_type   TEXT NOT NULL DEFAULT 'matter',
+				esphome_config  TEXT NOT NULL DEFAULT '',
+				esphome_api_key TEXT NOT NULL DEFAULT '',
+				created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+			)`,
+			`INSERT INTO devices_v2 (id, name, template_id, fw_version, psk, status, last_seen, ip, matter_discrim, matter_passcode, created_at)
+			 SELECT id, name, template_id, fw_version, psk, status, last_seen, ip, matter_discrim, matter_passcode, created_at FROM devices`,
+			`DROP TABLE devices`,
+			`ALTER TABLE devices_v2 RENAME TO devices`,
+			`CREATE INDEX IF NOT EXISTS idx_devices_name ON devices(name)`,
+			`PRAGMA foreign_keys=ON`,
+		}
+		for _, s := range stmts {
+			if _, err := sqldb.Exec(s); err != nil {
+				sqldb.Close()
+				return nil, fmt.Errorf("ESPHome migration (%q): %w", s, err)
+			}
+		}
+	}
+
 	return &Database{DB: sqldb}, nil
 }
 

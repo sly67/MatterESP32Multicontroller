@@ -1,14 +1,17 @@
 CREATE TABLE IF NOT EXISTS devices (
-    id          TEXT PRIMARY KEY,
-    name        TEXT NOT NULL,
-    template_id TEXT NOT NULL REFERENCES templates(id),
-    fw_version  TEXT NOT NULL DEFAULT '',
-    psk         BLOB NOT NULL,
-    status      TEXT NOT NULL DEFAULT 'unknown',
-    last_seen   DATETIME,
+    id              TEXT PRIMARY KEY,
+    name            TEXT NOT NULL,
+    template_id     TEXT,
+    fw_version      TEXT NOT NULL DEFAULT '',
+    psk             BLOB NOT NULL DEFAULT x'',
+    status          TEXT NOT NULL DEFAULT 'unknown',
+    last_seen       DATETIME,
     ip              TEXT NOT NULL DEFAULT '',
     matter_discrim  INTEGER NOT NULL DEFAULT 0,
     matter_passcode INTEGER NOT NULL DEFAULT 0,
+    firmware_type   TEXT NOT NULL DEFAULT 'matter',
+    esphome_config  TEXT NOT NULL DEFAULT '',
+    esphome_api_key TEXT NOT NULL DEFAULT '',
     created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -70,3 +70,56 @@ func TestDevice_UpdateMatterCreds(t *testing.T) {
 	assert.Equal(t, uint16(3840), got.MatterDiscrim)
 	assert.Equal(t, uint32(20202021), got.MatterPasscode)
 }
+
+func TestDevice_CreateESPHome(t *testing.T) {
+	database, err := db.Open(":memory:")
+	require.NoError(t, err)
+	defer database.Close()
+
+	require.NoError(t, database.CreateDevice(db.Device{
+		ID:            "dev-esph",
+		Name:          "Kitchen Sensor",
+		FirmwareType:  "esphome",
+		ESPHomeConfig: `{"board":"esp32-c3","components":[]}`,
+		PSK:           []byte{},
+	}))
+
+	got, err := database.GetDevice("dev-esph")
+	require.NoError(t, err)
+	assert.Equal(t, "esphome", got.FirmwareType)
+	assert.Equal(t, `{"board":"esp32-c3","components":[]}`, got.ESPHomeConfig)
+	assert.Equal(t, "", got.TemplateID)
+}
+
+func TestDevice_ESPHomeShownInList(t *testing.T) {
+	database, err := db.Open(":memory:")
+	require.NoError(t, err)
+	defer database.Close()
+
+	require.NoError(t, database.CreateDevice(db.Device{
+		ID: "dev-esph", Name: "Sensor", FirmwareType: "esphome", PSK: []byte{},
+	}))
+
+	devs, err := database.ListDevices()
+	require.NoError(t, err)
+	require.Len(t, devs, 1)
+	assert.Equal(t, "esphome", devs[0].FirmwareType)
+}
+
+func TestDevice_ESPHomeAPIKey(t *testing.T) {
+	database, err := db.Open(":memory:")
+	require.NoError(t, err)
+	defer database.Close()
+
+	require.NoError(t, database.CreateDevice(db.Device{
+		ID: "dev-esph", Name: "Sensor", FirmwareType: "esphome",
+		ESPHomeAPIKey: "apikey123",
+		ESPHomeConfig: `{"ota_password":"otapass"}`,
+		PSK:           []byte{},
+	}))
+
+	got, err := database.GetDevice("dev-esph")
+	require.NoError(t, err)
+	assert.Equal(t, "apikey123", got.ESPHomeAPIKey)
+	assert.Equal(t, `{"ota_password":"otapass"}`, got.ESPHomeConfig)
+}
