@@ -26,3 +26,7 @@ io:
 matter:
   endpoint_type: extended_color_light
   behaviors: [color_control, brightness]
+esphome:
+  components:
+    - domain: light
+      template: "platform: rgbw\n  name: \"{NAME}\"\n  red:\n    platform: ledc\n    pin: \"{R}\"\n    id: led_r_{NAME}\n  green:\n    platform: ledc\n    pin: \"{G}\"\n    id: led_g_{NAME}\n  blue:\n    platform: ledc\n    pin: \"{B}\"\n    id: led_b_{NAME}\n  white:\n    platform: ledc\n    pin: \"{W}\"\n    id: led_w_{NAME}"

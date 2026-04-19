@@ -1,0 +1,17 @@
+id: binary-input
+name: "Binary Input (button / door sensor)"
+version: "1.0"
+category: io
+io:
+  - id: PIN
+    type: digital_in
+    label: "Input pin"
+    constraints:
+      digital: {active: low, initial_state: low}
+matter:
+  endpoint_type: contact_sensor
+  behaviors: [boolean_state]
+esphome:
+  components:
+    - domain: binary_sensor
+      template: "platform: gpio\n  pin:\n    number: \"{PIN}\"\n    mode: INPUT_PULLUP\n    inverted: true\n  name: \"{NAME}\""

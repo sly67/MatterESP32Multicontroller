@@ -1,0 +1,17 @@
+id: dht22
+name: "DHT22 Temperature & Humidity"
+version: "1.0"
+category: sensor
+io:
+  - id: DATA
+    type: digital_out
+    label: "Data pin"
+    constraints:
+      digital: {active: high, initial_state: low}
+matter:
+  endpoint_type: temperature_sensor
+  behaviors: [temperature_reporting]
+esphome:
+  components:
+    - domain: sensor
+      template: "platform: dht\n  model: DHT22\n  pin: \"{DATA}\"\n  temperature:\n    name: \"{NAME} Temperature\"\n  humidity:\n    name: \"{NAME} Humidity\"\n  update_interval: 30s"

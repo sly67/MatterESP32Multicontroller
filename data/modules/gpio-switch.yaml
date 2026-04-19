@@ -11,3 +11,7 @@ io:
 matter:
   endpoint_type: on_off_light
   behaviors: [on_off]
+esphome:
+  components:
+    - domain: switch
+      template: "platform: gpio\n  pin: \"{OUT}\"\n  name: \"{NAME}\""

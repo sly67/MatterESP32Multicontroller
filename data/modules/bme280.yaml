@@ -1,0 +1,24 @@
+id: bme280
+name: "BME280 Temp/Humidity/Pressure"
+version: "1.0"
+category: sensor
+io:
+  - id: SDA
+    type: i2c_data
+    label: "I2C Data"
+    constraints:
+      i2c: {speed: 400000, pullup: internal}
+  - id: SCL
+    type: i2c_clock
+    label: "I2C Clock"
+    constraints:
+      i2c: {speed: 400000, pullup: internal}
+matter:
+  endpoint_type: temperature_sensor
+  behaviors: [temperature_reporting]
+esphome:
+  components:
+    - domain: i2c
+      template: "sda: \"{SDA}\"\n  scl: \"{SCL}\"\n  id: i2c_bus_{NAME}"
+    - domain: sensor
+      template: "platform: bme280_i2c\n  i2c_id: i2c_bus_{NAME}\n  temperature:\n    name: \"{NAME} Temperature\"\n  humidity:\n    name: \"{NAME} Humidity\"\n  pressure:\n    name: \"{NAME} Pressure\"\n  update_interval: 30s"

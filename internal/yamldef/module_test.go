@@ -89,3 +89,52 @@ matter:
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "io type")
 }
+
+func TestParseModule_ESPHomeBlock(t *testing.T) {
+	yaml := []byte(`
+id: test-gpio
+name: "Test GPIO"
+version: "1.0"
+category: io
+io:
+  - id: OUT
+    type: digital_out
+    label: "Output"
+    constraints:
+      digital: {active: high, initial_state: low}
+matter:
+  endpoint_type: on_off_light
+  behaviors: [on_off]
+esphome:
+  components:
+    - domain: switch
+      template: "platform: gpio\npin: \"{OUT}\"\nname: \"{NAME}\""
+`)
+	mod, err := yamldef.ParseModule(yaml)
+	require.NoError(t, err)
+	require.NotNil(t, mod.ESPHome)
+	require.Len(t, mod.ESPHome.Components, 1)
+	assert.Equal(t, "switch", mod.ESPHome.Components[0].Domain)
+	assert.Contains(t, mod.ESPHome.Components[0].Template, "{OUT}")
+}
+
+func TestParseModule_NoESPHomeIsValid(t *testing.T) {
+	yaml := []byte(`
+id: gpio-switch
+name: "GPIO Switch"
+version: "1.0"
+category: io
+io:
+  - id: OUT
+    type: digital_out
+    label: "Output"
+    constraints:
+      digital: {active: high, initial_state: low}
+matter:
+  endpoint_type: on_off_light
+  behaviors: [on_off]
+`)
+	mod, err := yamldef.ParseModule(yaml)
+	require.NoError(t, err)
+	assert.Nil(t, mod.ESPHome)
+}

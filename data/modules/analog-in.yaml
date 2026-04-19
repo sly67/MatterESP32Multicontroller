@@ -16,3 +16,7 @@ io:
 matter:
   endpoint_type: generic_sensor
   behaviors: [value_reporting]
+esphome:
+  components:
+    - domain: sensor
+      template: "platform: adc\n  pin: \"{SIG}\"\n  name: \"{NAME}\"\n  update_interval: 10s\n  attenuation: 11db"

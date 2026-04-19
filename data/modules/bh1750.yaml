@@ -16,6 +16,12 @@ io:
 matter:
   endpoint_type: illuminance_sensor
   behaviors: [lux_reporting]
+esphome:
+  components:
+    - domain: i2c
+      template: "sda: \"{SDA}\"\n  scl: \"{SCL}\"\n  id: i2c_bus_{NAME}"
+    - domain: sensor
+      template: "platform: bh1750\n  name: \"{NAME} Illuminance\"\n  i2c_id: i2c_bus_{NAME}\n  update_interval: 10s"
 measurement:
   trigger_interval_ms: 5000
   max_duration_ms: 100

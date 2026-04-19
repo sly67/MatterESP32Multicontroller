@@ -1,0 +1,17 @@
+id: neopixel
+name: "NeoPixel / WS2812 Strip"
+version: "1.0"
+category: driver
+io:
+  - id: DATA
+    type: digital_out
+    label: "Data pin"
+    constraints:
+      digital: {active: high, initial_state: low}
+matter:
+  endpoint_type: extended_color_light
+  behaviors: [color_control, brightness]
+esphome:
+  components:
+    - domain: light
+      template: "platform: neopixelbus\n  type: GRB\n  variant: WS2812\n  pin: \"{DATA}\"\n  num_leds: 30\n  name: \"{NAME}\""

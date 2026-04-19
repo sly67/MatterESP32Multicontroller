@@ -40,6 +40,7 @@ type Module struct {
 	PWMModes     map[string]map[string]interface{} `yaml:"pwm_modes,omitempty"`
 	Capabilities []Capability                      `yaml:"capabilities,omitempty"`
 	Matter       MatterDef                         `yaml:"matter"`
+	ESPHome      *ESPHomeDef                       `yaml:"esphome,omitempty"`
 	Measurement  *Measurement                      `yaml:"measurement,omitempty"`
 }
 
@@ -124,6 +125,19 @@ type CapabilityOption struct {
 type MatterDef struct {
 	EndpointType string   `yaml:"endpoint_type"`
 	Behaviors    []string `yaml:"behaviors"`
+}
+
+// ESPHomeComponent is one ESPHome component block inside a module's esphome: section.
+// Domain maps to the top-level ESPHome YAML key (e.g. "sensor", "switch", "light").
+// Template is raw YAML with {PIN_ROLE} and {NAME} placeholders substituted at assembly time.
+type ESPHomeComponent struct {
+	Domain   string `yaml:"domain"`
+	Template string `yaml:"template"`
+}
+
+// ESPHomeDef is the esphome: block in a module YAML.
+type ESPHomeDef struct {
+	Components []ESPHomeComponent `yaml:"components"`
 }
 
 // Measurement defines a custom sensor measurement routine.
