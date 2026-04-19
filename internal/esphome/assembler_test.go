@@ -102,6 +102,30 @@ func TestAssemble_MultipleComponentsSameDomain(t *testing.T) {
 	assert.Contains(t, out, "Sensor 2 Temperature")
 }
 
+func TestAssemble_IDSubstitution(t *testing.T) {
+	mods := map[string]*yamldef.Module{
+		"led-strip": {
+			ESPHome: &yamldef.ESPHomeDef{
+				Components: []yamldef.ESPHomeComponent{
+					{Domain: "output", Template: "platform: ledc\n  pin: \"{AIN1}\"\n  id: {ID}_ain1"},
+					{Domain: "light", Template: "platform: monochromatic\n  name: \"{NAME}\"\n  output: {ID}_ain1"},
+				},
+			},
+		},
+	}
+	cfg := esphome.Config{
+		Board: "esp32-c3", DeviceName: "x", DeviceID: "y",
+		WiFiSSID: "n", WiFiPassword: "p", OTAPassword: "o", HubURL: "http://h",
+		Components: []esphome.ComponentConfig{
+			{Type: "led-strip", Name: "Room Strip", Pins: map[string]string{"AIN1": "GPIO4"}},
+		},
+	}
+	out, err := esphome.Assemble(cfg, mods)
+	require.NoError(t, err)
+	assert.Contains(t, out, "room_strip_ain1", "ID placeholder must be replaced with slugified component name")
+	assert.NotContains(t, out, "{ID}", "raw {ID} placeholder must not appear in output")
+}
+
 func TestAssemble_UnknownModuleError(t *testing.T) {
 	cfg := esphome.Config{
 		Board: "esp32-c3", DeviceName: "x", DeviceID: "y",

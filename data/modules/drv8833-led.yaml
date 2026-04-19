@@ -1,0 +1,54 @@
+id: drv8833-led
+name: "DRV8833 Warm White LED Strip (A Channel)"
+version: "1.0"
+category: driver
+io:
+  - id: AIN1
+    type: digital_pwm_out
+    label: "Bridge A Input 1 → AOUT1 (A+)"
+    constraints:
+      pwm: {frequency_hz: 25000, duty_min: 0.0, duty_max: 1.0, resolution_bits: 11}
+  - id: AIN2
+    type: digital_pwm_out
+    label: "Bridge A Input 2 → AOUT2 (A-)"
+    constraints:
+      pwm: {frequency_hz: 25000, duty_min: 0.0, duty_max: 1.0, resolution_bits: 11}
+pin_groups:
+  # AIN1 and AIN2 are complementary — never drive both high simultaneously.
+  # DRV8833 has ~100 ns internal dead time; avoid overlapping transitions in software.
+  - {id: bridge_A, pins: [AIN1, AIN2], mode: complementary, dead_time_us: 1}
+matter:
+  endpoint_type: dimmable_light
+  behaviors: [on_off, level_control]
+esphome:
+  components:
+    - domain: output
+      template: |
+        platform: ledc
+        pin: "{AIN1}"
+        id: {ID}_ain1
+        frequency: 25000Hz
+    - domain: output
+      template: |
+        platform: ledc
+        pin: "{AIN2}"
+        id: {ID}_ain2
+        frequency: 25000Hz
+    - domain: light
+      template: |
+        platform: monochromatic
+        name: "{NAME} Side 1"
+        output: {ID}_ain1
+        effects:
+          - strobe:
+          - pulse:
+          - flicker:
+    - domain: light
+      template: |
+        platform: monochromatic
+        name: "{NAME} Side 2"
+        output: {ID}_ain2
+        effects:
+          - strobe:
+          - pulse:
+          - flicker:

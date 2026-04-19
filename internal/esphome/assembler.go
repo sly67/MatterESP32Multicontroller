@@ -40,6 +40,20 @@ func slug(name string) string {
 	return strings.ToLower(strings.ReplaceAll(strings.TrimSpace(name), " ", "-"))
 }
 
+// idSlug converts a component name into a valid ESPHome/C++ identifier.
+func idSlug(name string) string {
+	s := strings.ToLower(strings.TrimSpace(name))
+	var b strings.Builder
+	for _, r := range s {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		} else {
+			b.WriteByte('_')
+		}
+	}
+	return b.String()
+}
+
 // Assemble builds a complete ESPHome YAML string from cfg and the module library.
 func Assemble(cfg Config, modules map[string]*yamldef.Module) (string, error) {
 	bd, ok := boardDef[cfg.Board]
@@ -83,6 +97,7 @@ func Assemble(cfg Config, modules map[string]*yamldef.Module) (string, error) {
 		for _, ec := range mod.ESPHome.Components {
 			rendered := ec.Template
 			rendered = strings.ReplaceAll(rendered, "{NAME}", comp.Name)
+			rendered = strings.ReplaceAll(rendered, "{ID}", idSlug(comp.Name))
 			for role, gpio := range comp.Pins {
 				rendered = strings.ReplaceAll(rendered, "{"+role+"}", gpio)
 			}
