@@ -28,8 +28,8 @@
   });
 
   $: filtered = modules.filter(m => {
-    const matchName = m.name.toLowerCase().includes(filter.toLowerCase()) ||
-                      m.id.toLowerCase().includes(filter.toLowerCase());
+    const matchName = (m.name || '').toLowerCase().includes(filter.toLowerCase()) ||
+                      (m.id || '').toLowerCase().includes(filter.toLowerCase());
     const matchCat = categoryFilter === 'all' || m.category === categoryFilter;
     return matchName && matchCat;
   });
