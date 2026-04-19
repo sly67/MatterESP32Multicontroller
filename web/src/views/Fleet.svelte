@@ -44,6 +44,23 @@
   }
 
   function closePairModal() { pairModal = null; qrDataUrl = ''; pairError = ''; }
+
+  let espKeyModal = null; // { api_key, ota_password } | null
+  let espKeyError = '';
+
+  async function openESPHomeKey(device) {
+    espKeyError = '';
+    try {
+      espKeyModal = await api.get(`/api/devices/${device.id}/esphome-key`);
+    } catch (e) {
+      espKeyError = e.message;
+    }
+  }
+  function closeESPHomeKey() { espKeyModal = null; espKeyError = ''; }
+
+  function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).catch(() => {});
+  }
 </script>
 
 <div class="p-6 flex flex-col gap-4">
@@ -93,7 +110,13 @@
               <td class="text-sm font-mono">{d.fw_version || '—'}</td>
               <td class="text-sm font-mono">{d.ip || '—'}</td>
               <td class="text-sm text-base-content/50">{d.last_seen ? new Date(d.last_seen).toLocaleString() : '—'}</td>
-              <td><button class="btn btn-xs btn-outline" on:click={() => openPairModal(d)}>Pair</button></td>
+              <td>
+                {#if d.firmware_type === 'esphome'}
+                  <button class="btn btn-xs btn-outline" on:click={() => openESPHomeKey(d)}>ESPHome Key</button>
+                {:else}
+                  <button class="btn btn-xs btn-outline" on:click={() => openPairModal(d)}>Pair</button>
+                {/if}
+              </td>
             </tr>
           {/each}
         </tbody>
@@ -131,4 +154,44 @@
       </div>
     </div>
   </div>
+{/if}
+
+{#if espKeyModal}
+  <button class="fixed inset-0 z-40 bg-black/60 cursor-default" on:click={closeESPHomeKey} />
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="bg-base-200 rounded-xl shadow-xl w-full max-w-sm flex flex-col">
+      <div class="flex items-center justify-between px-5 py-3 border-b border-base-300">
+        <span class="font-semibold text-sm">ESPHome credentials</span>
+        <button class="btn btn-ghost btn-xs" on:click={closeESPHomeKey}>✕</button>
+      </div>
+      <div class="flex flex-col gap-3 p-5">
+        <p class="text-xs text-base-content/60">Use the API key in Home Assistant → Add Integration → ESPHome.</p>
+        <div class="w-full text-xs font-mono bg-base-300 rounded p-3 space-y-2">
+          <div class="flex items-center justify-between gap-2">
+            <div>
+              <div class="text-base-content/50">API Encryption Key</div>
+              <div class="break-all">{espKeyModal.api_key}</div>
+            </div>
+            <button class="btn btn-ghost btn-xs shrink-0"
+              on:click={() => copyToClipboard(espKeyModal.api_key)}>Copy</button>
+          </div>
+          <div class="flex items-center justify-between gap-2">
+            <div>
+              <div class="text-base-content/50">OTA Password</div>
+              <div class="break-all">{espKeyModal.ota_password}</div>
+            </div>
+            <button class="btn btn-ghost btn-xs shrink-0"
+              on:click={() => copyToClipboard(espKeyModal.ota_password)}>Copy</button>
+          </div>
+        </div>
+      </div>
+      <div class="px-5 pb-4 flex justify-end">
+        <button class="btn btn-ghost btn-sm" on:click={closeESPHomeKey}>Close</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+{#if espKeyError}
+  <div class="toast toast-end"><div class="alert alert-error text-xs">{espKeyError}</div></div>
 {/if}
