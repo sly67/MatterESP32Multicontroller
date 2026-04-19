@@ -46,6 +46,10 @@ func getPairingInfo(database *db.Database) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		if dev.MatterPasscode == 0 {
+			http.Error(w, "pairing credentials not available for this device", http.StatusNotFound)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"discriminator": dev.MatterDiscrim,

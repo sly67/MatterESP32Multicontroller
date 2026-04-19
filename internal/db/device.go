@@ -20,9 +20,9 @@ type Device struct {
 // CreateDevice inserts a new device record.
 func (d *Database) CreateDevice(dev Device) error {
 	_, err := d.DB.Exec(
-		`INSERT INTO devices (id, name, template_id, fw_version, psk, status)
-		 VALUES (?, ?, ?, ?, ?, 'unknown')`,
-		dev.ID, dev.Name, dev.TemplateID, dev.FWVersion, dev.PSK)
+		`INSERT INTO devices (id, name, template_id, fw_version, psk, status, matter_discrim, matter_passcode)
+		 VALUES (?, ?, ?, ?, ?, 'unknown', ?, ?)`,
+		dev.ID, dev.Name, dev.TemplateID, dev.FWVersion, dev.PSK, dev.MatterDiscrim, dev.MatterPasscode)
 	return err
 }
 

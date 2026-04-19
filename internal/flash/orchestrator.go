@@ -89,21 +89,17 @@ func FlashDevice(database *db.Database, req Request) Result {
 		return Result{Name: req.DeviceName, Error: fmt.Errorf("flash NVS: %w", err)}
 	}
 
-	// 8. Register device in DB
+	// 8. Register device in DB (Matter creds included atomically)
 	if err := database.CreateDevice(db.Device{
-		ID:         chip.DeviceID,
-		Name:       req.DeviceName,
-		TemplateID: req.Template.ID,
-		FWVersion:  req.FWVersion,
-		PSK:        psk,
-		Status:     "unknown",
+		ID:             chip.DeviceID,
+		Name:           req.DeviceName,
+		TemplateID:     req.Template.ID,
+		FWVersion:      req.FWVersion,
+		PSK:            psk,
+		MatterDiscrim:  discrim,
+		MatterPasscode: passcode,
 	}); err != nil {
 		return Result{Name: req.DeviceName, Error: fmt.Errorf("register device: %w", err)}
-	}
-
-	// 9. Persist Matter commissioning credentials
-	if err := database.UpdateDeviceMatterCreds(chip.DeviceID, discrim, passcode); err != nil {
-		return Result{Name: req.DeviceName, Error: fmt.Errorf("save matter creds: %w", err)}
 	}
 
 	return Result{DeviceID: chip.DeviceID, Name: req.DeviceName}
@@ -122,7 +118,7 @@ func generateMatterCreds() (uint16, uint32, error) {
 		44444444: true, 55555555: true, 66666666: true, 77777777: true,
 		88888888: true, 99999999: true, 12345678: true, 87654321: true,
 	}
-	passcode := binary.LittleEndian.Uint32(buf[2:6])&0x07FFFFFF + 1
+	passcode := binary.LittleEndian.Uint32(buf[2:6])%(99999998) + 1
 	if invalidPasscodes[passcode] {
 		passcode = 20202021
 	}
