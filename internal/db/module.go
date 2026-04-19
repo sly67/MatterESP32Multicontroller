@@ -12,7 +12,7 @@ type ModuleRow struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// CreateModule inserts a module record. Ignores conflict (idempotent for seeding).
+// CreateModule inserts a module record. Ignores conflict (idempotent for user modules).
 func (d *Database) CreateModule(m ModuleRow) error {
 	builtin := 0
 	if m.Builtin {
@@ -22,6 +22,22 @@ func (d *Database) CreateModule(m ModuleRow) error {
 		`INSERT OR IGNORE INTO modules (id, name, category, builtin, yaml_body)
 		 VALUES (?, ?, ?, ?, ?)`,
 		m.ID, m.Name, m.Category, builtin, m.YAMLBody)
+	return err
+}
+
+// UpsertBuiltinModule inserts or updates a builtin module so that source changes
+// propagate to the DB on every restart. User-created modules with the same ID
+// (builtin = 0) are left untouched.
+func (d *Database) UpsertBuiltinModule(m ModuleRow) error {
+	_, err := d.DB.Exec(
+		`INSERT INTO modules (id, name, category, builtin, yaml_body)
+		 VALUES (?, ?, ?, 1, ?)
+		 ON CONFLICT(id) DO UPDATE SET
+		   name     = excluded.name,
+		   category = excluded.category,
+		   yaml_body = excluded.yaml_body
+		 WHERE modules.builtin = 1`,
+		m.ID, m.Name, m.Category, m.YAMLBody)
 	return err
 }
 

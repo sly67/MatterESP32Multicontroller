@@ -1,6 +1,6 @@
 id: drv8833-led
 name: "DRV8833 Warm White LED Strip (A Channel)"
-version: "1.2"
+version: "1.3"
 category: driver
 io:
   - id: AIN1
@@ -14,8 +14,8 @@ io:
     constraints:
       pwm: {frequency_hz: 25000, duty_min: 0.0, duty_max: 1.0, resolution_bits: 11}
 pin_groups:
-  # Anti-parallel LEDs on one H-bridge — cwww platform blends the two sides;
-  # DRV8833 handles simultaneous drive safely (brake mode = 0 V across strip).
+  # Anti-parallel LEDs on one H-bridge — cwww blends the two sides;
+  # DRV8833 handles simultaneous drive safely (brake = 0 V across strip).
   - {id: bridge_A, pins: [AIN1, AIN2], mode: complementary, dead_time_us: 1}
 matter:
   endpoint_type: color_temperature_light
@@ -47,3 +47,26 @@ esphome:
           - strobe:
           - pulse:
           - flicker:
+          - lambda:
+              name: Twinkle
+              update_interval: 50ms
+              lambda: |-
+                static uint8_t step = 0;
+                static bool side = false;
+                const uint8_t FADE = 20, HOLD = 10, PAUSE = 20;
+                const uint8_t CYCLE = FADE * 2 + HOLD + PAUSE;
+                float duty = 0.0f;
+                if (step < FADE)
+                  duty = 0.5f * step / FADE;
+                else if (step < FADE + HOLD)
+                  duty = 0.5f;
+                else if (step < FADE * 2 + HOLD)
+                  duty = 0.5f * (FADE * 2 + HOLD - step) / FADE;
+                if (side) {
+                  id({ID}_ain1).set_level(0.0f);
+                  id({ID}_ain2).set_level(duty);
+                } else {
+                  id({ID}_ain1).set_level(duty);
+                  id({ID}_ain2).set_level(0.0f);
+                }
+                if (++step >= CYCLE) { step = 0; side = !side; }

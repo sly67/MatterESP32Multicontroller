@@ -23,7 +23,7 @@ func SeedBuiltins(database *db.Database) error {
 		if err != nil {
 			return fmt.Errorf("marshal module %q: %w", m.ID, err)
 		}
-		if err := database.CreateModule(db.ModuleRow{
+		if err := database.UpsertBuiltinModule(db.ModuleRow{
 			ID:       m.ID,
 			Name:     m.Name,
 			Category: m.Category,
