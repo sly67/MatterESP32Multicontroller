@@ -48,3 +48,25 @@ func TestDevice_CreateAndGet(t *testing.T) {
 	assert.Equal(t, "1/Bedroom", got.Name)
 	assert.Equal(t, []byte("testpsk"), got.PSK)
 }
+
+func TestDevice_UpdateMatterCreds(t *testing.T) {
+	database, err := db.Open(":memory:")
+	require.NoError(t, err)
+	defer database.Close()
+
+	_, err = database.DB.Exec(
+		`INSERT INTO templates (id, name, board, yaml_body) VALUES (?, ?, ?, ?)`,
+		"tpl-1", "T1", "esp32-c3", "id: tpl-1",
+	)
+	require.NoError(t, err)
+	require.NoError(t, database.CreateDevice(db.Device{
+		ID: "dev-1", Name: "1/Bedroom", TemplateID: "tpl-1", PSK: make([]byte, 32),
+	}))
+
+	require.NoError(t, database.UpdateDeviceMatterCreds("dev-1", 3840, 20202021))
+
+	got, err := database.GetDevice("dev-1")
+	require.NoError(t, err)
+	assert.Equal(t, uint16(3840), got.MatterDiscrim)
+	assert.Equal(t, uint32(20202021), got.MatterPasscode)
+}

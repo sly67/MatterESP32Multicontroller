@@ -41,6 +41,12 @@ func Open(path string) (*Database, error) {
 		sqldb.Close()
 		return nil, fmt.Errorf("apply schema: %w", err)
 	}
+	for _, up := range []string{
+		`ALTER TABLE devices ADD COLUMN matter_discrim  INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE devices ADD COLUMN matter_passcode INTEGER NOT NULL DEFAULT 0`,
+	} {
+		sqldb.Exec(up) //nolint:errcheck // column may already exist on new installs
+	}
 	return &Database{DB: sqldb}, nil
 }
 

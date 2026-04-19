@@ -6,8 +6,10 @@ CREATE TABLE IF NOT EXISTS devices (
     psk         BLOB NOT NULL,
     status      TEXT NOT NULL DEFAULT 'unknown',
     last_seen   DATETIME,
-    ip          TEXT NOT NULL DEFAULT '',
-    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ip              TEXT NOT NULL DEFAULT '',
+    matter_discrim  INTEGER NOT NULL DEFAULT 0,
+    matter_passcode INTEGER NOT NULL DEFAULT 0,
+    created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS templates (
