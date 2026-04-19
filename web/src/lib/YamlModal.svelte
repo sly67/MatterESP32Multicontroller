@@ -3,9 +3,14 @@
   export let yaml = '';
   export let open = false;
   export let readonly = false;
+  export let error = '';   // caller sets this to show an error inside the modal
 
   export let onClose = () => {};
   export let onSave  = null;
+
+  async function handleSave() {
+    try { await onSave(yaml); } catch (_) { /* caller sets error prop */ }
+  }
 </script>
 
 {#if open}
@@ -25,9 +30,14 @@
         ></textarea>
       </div>
       {#if onSave}
-        <div class="px-5 py-3 border-t border-base-300 flex justify-end gap-2">
-          <button class="btn btn-ghost btn-sm" on:click={onClose}>Cancel</button>
-          <button class="btn btn-primary btn-sm" on:click={() => onSave(yaml)}>Save</button>
+        <div class="px-5 py-3 border-t border-base-300 flex flex-col gap-2">
+          {#if error}
+            <div class="alert alert-error text-xs py-2">{error}</div>
+          {/if}
+          <div class="flex justify-end gap-2">
+            <button class="btn btn-ghost btn-sm" on:click={onClose}>Cancel</button>
+            <button class="btn btn-primary btn-sm" on:click={handleSave}>Save</button>
+          </div>
         </div>
       {/if}
     </div>
