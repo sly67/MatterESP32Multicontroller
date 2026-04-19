@@ -152,6 +152,7 @@
   function reset() {
     step = 1; selectedTemplate = null; deviceNames = [''];
     wifiSSID = ''; wifiPassword = ''; results = []; flashError = '';
+    selectedPort = ''; selectedFW = latestVersion;
   }
 
   // ── Serial Debug ───────────────────────────────────────────────────────────
@@ -380,7 +381,7 @@
         <div class="flex gap-2 justify-end">
           <button class="btn btn-ghost btn-sm"
             disabled={bfFlashing || browserFlashState !== 'idle'}
-            on:click={() => { bfStep = 3; bfToken = ''; browserFlashState = 'idle'; }}>← Back</button>
+            on:click={() => { bfStep = 3; bfToken = ''; browserFlashState = 'idle'; bfPairing = null; bfQrDataUrl = ''; }}>← Back</button>
 
           {#if !bfToken}
             <button class="btn btn-warning btn-sm" disabled={bfFlashing} on:click={bfDoFlash}>
