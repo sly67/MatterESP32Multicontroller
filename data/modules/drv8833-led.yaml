@@ -1,25 +1,25 @@
 id: drv8833-led
 name: "DRV8833 Warm White LED Strip (A Channel)"
-version: "1.1"
+version: "1.2"
 category: driver
 io:
   - id: AIN1
     type: digital_pwm_out
-    label: "Bridge A Input 1 → AOUT1 (A+) — positive LED drive"
+    label: "Bridge A Input 1 → AOUT1 (A+) — Side 1"
     constraints:
       pwm: {frequency_hz: 25000, duty_min: 0.0, duty_max: 1.0, resolution_bits: 11}
   - id: AIN2
     type: digital_pwm_out
-    label: "Bridge A Input 2 → AOUT2 (A-) — negative LED drive"
+    label: "Bridge A Input 2 → AOUT2 (A-) — Side 2"
     constraints:
       pwm: {frequency_hz: 25000, duty_min: 0.0, duty_max: 1.0, resolution_bits: 11}
 pin_groups:
-  # Anti-parallel LEDs on one H-bridge — AIN1 and AIN2 must never be active simultaneously.
-  # DRV8833 has ~100 ns internal dead time; software interlock via on_turn_on provides extra safety.
+  # Anti-parallel LEDs on one H-bridge — cwww platform blends the two sides;
+  # DRV8833 handles simultaneous drive safely (brake mode = 0 V across strip).
   - {id: bridge_A, pins: [AIN1, AIN2], mode: complementary, dead_time_us: 1}
 matter:
-  endpoint_type: dimmable_light
-  behaviors: [on_off, level_control]
+  endpoint_type: color_temperature_light
+  behaviors: [on_off, level_control, color_temperature]
 esphome:
   components:
     - domain: output
@@ -36,26 +36,13 @@ esphome:
         frequency: 25000Hz
     - domain: light
       template: |
-        platform: monochromatic
-        name: "{NAME} Side 1"
-        id: {ID}_side1
-        output: {ID}_ain1
-        on_turn_on:
-          then:
-            - light.turn_off: {ID}_side2
-        effects:
-          - strobe:
-          - pulse:
-          - flicker:
-    - domain: light
-      template: |
-        platform: monochromatic
-        name: "{NAME} Side 2"
-        id: {ID}_side2
-        output: {ID}_ain2
-        on_turn_on:
-          then:
-            - light.turn_off: {ID}_side1
+        platform: cwww
+        name: "{NAME}"
+        warm_white: {ID}_ain1
+        cold_white: {ID}_ain2
+        warm_white_color_temperature: 2700K
+        cold_white_color_temperature: 6500K
+        gamma_correct: 1
         effects:
           - strobe:
           - pulse:
