@@ -101,6 +101,11 @@ func FlashDevice(database *db.Database, req Request) Result {
 		return Result{Name: req.DeviceName, Error: fmt.Errorf("register device: %w", err)}
 	}
 
+	// 9. Persist Matter commissioning credentials
+	if err := database.UpdateDeviceMatterCreds(chip.DeviceID, discrim, passcode); err != nil {
+		return Result{Name: req.DeviceName, Error: fmt.Errorf("save matter creds: %w", err)}
+	}
+
 	return Result{DeviceID: chip.DeviceID, Name: req.DeviceName}
 }
 
