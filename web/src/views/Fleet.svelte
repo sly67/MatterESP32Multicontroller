@@ -23,8 +23,8 @@
   });
 
   $: filtered = devices.filter(d =>
-    d.name.toLowerCase().includes(filter.toLowerCase()) ||
-    d.status.toLowerCase().includes(filter.toLowerCase())
+    (d.name || '').toLowerCase().includes(filter.toLowerCase()) ||
+    (d.status || '').toLowerCase().includes(filter.toLowerCase())
   );
 
   const statusClass = s => ({
