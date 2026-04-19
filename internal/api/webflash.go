@@ -68,6 +68,7 @@ func webflashRouter(cfg *config.Config, database *db.Database) func(chi.Router) 
 		// Dynamic manifest with NVS (requires ?token=)
 		r.Get("/manifest", serveWebFlashManifestDynamic(database))
 		r.Get("/nvs", serveWebFlashNVS())
+		r.Get("/firmware", serveSessionFirmwareBin(firmwareDir))
 		r.Post("/prepare", prepareWebFlash(database))
 
 		r.Get("/bootloader.bin", serveFlashStatic("flash/esp32c3/bootloader.bin", "bootloader.bin"))
@@ -85,6 +86,7 @@ func prepareWebFlash(database *db.Database) http.HandlerFunc {
 			DeviceName   string `json:"device_name"`
 			WiFiSSID     string `json:"wifi_ssid"`
 			WiFiPassword string `json:"wifi_password"`
+			FWVersion    string `json:"fw_version"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "invalid JSON", http.StatusBadRequest)
@@ -106,9 +108,15 @@ func prepareWebFlash(database *db.Database) http.HandlerFunc {
 			return
 		}
 
-		fw, err := database.GetLatestFirmware()
-		if err != nil {
-			http.Error(w, "no firmware available", http.StatusServiceUnavailable)
+		var fw db.FirmwareRow
+		var fwErr error
+		if req.FWVersion != "" {
+			fw, fwErr = database.GetFirmware(req.FWVersion)
+		} else {
+			fw, fwErr = database.GetLatestFirmware()
+		}
+		if fwErr != nil {
+			http.Error(w, "firmware not found", http.StatusNotFound)
 			return
 		}
 
@@ -209,7 +217,7 @@ func serveWebFlashManifestDynamic(database *db.Database) http.HandlerFunc {
 						{Path: "/api/webflash/bootloader.bin", Offset: 0x0},
 						{Path: "/api/webflash/partition-table.bin", Offset: 0x8000},
 						{Path: "/api/webflash/ota_data_initial.bin", Offset: 0xf000},
-						{Path: "/api/webflash/firmware.bin", Offset: 0x20000},
+						{Path: fmt.Sprintf("/api/webflash/firmware?token=%s", token), Offset: 0x20000},
 						{Path: fmt.Sprintf("/api/webflash/nvs?token=%s", token), Offset: 0x9000},
 					},
 				},
@@ -318,6 +326,32 @@ func serveLatestFirmwareBin(database *db.Database, firmwareDir string) http.Hand
 			return
 		}
 		path := filepath.Join(firmwareDir, fw.Version+".bin")
+		f, err := os.Open(path)
+		if err != nil {
+			http.Error(w, "firmware file not found", http.StatusNotFound)
+			return
+		}
+		defer f.Close()
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Content-Disposition", `attachment; filename="firmware.bin"`)
+		io.Copy(w, f)
+	})
+}
+
+func serveSessionFirmwareBin(firmwareDir string) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token := r.URL.Query().Get("token")
+
+		sessionMu.Lock()
+		sess, ok := sessions[token]
+		sessionMu.Unlock()
+
+		if !ok {
+			http.Error(w, "invalid or expired token", http.StatusBadRequest)
+			return
+		}
+
+		path := filepath.Join(firmwareDir, sess.fwVersion+".bin")
 		f, err := os.Open(path)
 		if err != nil {
 			http.Error(w, "firmware file not found", http.StatusNotFound)
