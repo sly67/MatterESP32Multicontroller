@@ -1,5 +1,6 @@
 <script>
   import { onMount, tick } from 'svelte';
+  import QRCode from 'qrcode';
   import { api } from '../lib/api.js';
 
   // ── Tab ────────────────────────────────────────────────────────────────────
@@ -12,6 +13,73 @@
   let browserFlashMsg = '';
   let firmwareAvailable = false;
   let latestVersion = '';
+
+  // Browser flash wizard — 5 steps mirroring Server Flash
+  let bfStep = 1;      // 1=template 2=name 3=wifi 4=flash 5=done
+  let bfTemplate = null;
+  let bfDeviceName = '';
+  let bfSSID = '';
+  let bfPassword = '';
+  let bfToken = '';
+  let bfFW = '';
+  let bfFlashing = false;
+  let bfFlashError = '';
+  let bfPairing = null; // { discriminator, passcode, qr_payload } | null
+  let bfQrDataUrl = '';
+
+  async function bfDoFlash() {
+    bfFlashError = '';
+    bfFlashing = true;
+    try {
+      const res = await fetch('/api/webflash/prepare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          template_id:   bfTemplate.id,
+          device_name:   bfDeviceName,
+          wifi_ssid:     bfSSID,
+          wifi_password: bfPassword,
+          fw_version:    bfFW,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      bfToken = data.token;
+      bfPairing = { discriminator: data.discriminator, passcode: data.passcode, qr_payload: data.qr_payload };
+      bfQrDataUrl = await QRCode.toDataURL(data.qr_payload, { width: 180, margin: 2 });
+      browserFlashState = 'idle';
+      browserFlashMsg = '';
+    } catch (e) {
+      bfFlashError = e.message;
+    } finally {
+      bfFlashing = false;
+    }
+  }
+
+  // Called by esp-web-tools once flashing finishes or errors
+  function handleInstallEvent(e) {
+    const state = e.detail?.state;
+    if (!state) return;
+    if (state === 'finished') {
+      browserFlashState = 'done';
+      bfStep = 5;
+    } else if (state === 'error') {
+      browserFlashState = 'error';
+      browserFlashMsg = e.detail?.message || 'Flash failed';
+    } else if (state === 'initializing' || state === 'preparing') {
+      browserFlashState = 'connecting';
+      browserFlashMsg = 'Connecting to device…';
+    } else if (state === 'writing') {
+      browserFlashState = 'writing';
+      browserFlashMsg = e.detail?.details || 'Writing firmware…';
+    }
+  }
+
+  function bfReset() {
+    bfStep = 1; bfTemplate = null; bfDeviceName = ''; bfSSID = ''; bfPassword = '';
+    bfFW = latestVersion; bfToken = ''; bfFlashError = ''; browserFlashState = 'idle'; browserFlashMsg = '';
+    bfPairing = null; bfQrDataUrl = '';
+  }
 
   // ── Server Flash (existing wizard) ────────────────────────────────────────
   let step = 1;
@@ -42,6 +110,7 @@
       const latest = firmware.find(f => f.is_latest);
       if (latest) {
         selectedFW = latest.version;
+        bfFW = latest.version;
         firmwareAvailable = true;
         latestVersion = latest.version;
       }
@@ -83,24 +152,6 @@
   function reset() {
     step = 1; selectedTemplate = null; deviceNames = [''];
     wifiSSID = ''; wifiPassword = ''; results = []; flashError = '';
-  }
-
-  function handleInstallEvent(e) {
-    const state = e.detail?.state;
-    if (!state) return;
-    if (state === 'finished') {
-      browserFlashState = 'done';
-      browserFlashMsg = '';
-    } else if (state === 'error') {
-      browserFlashState = 'error';
-      browserFlashMsg = e.detail?.message || 'Flash failed';
-    } else if (state === 'initializing' || state === 'preparing') {
-      browserFlashState = 'connecting';
-      browserFlashMsg = 'Connecting to device…';
-    } else if (state === 'writing') {
-      browserFlashState = 'writing';
-      browserFlashMsg = e.detail?.details || 'Writing firmware…';
-    }
   }
 
   // ── Serial Debug ───────────────────────────────────────────────────────────
@@ -229,72 +280,165 @@
 
   <!-- ── Browser Flash ──────────────────────────────────────────────────── -->
   {#if activeTab === 'browser'}
-    <div class="flex flex-col gap-4">
-      <div class="text-sm text-base-content/60">
-        Plug your ESP32-C3 into <strong>your computer</strong> via USB, then click the button below.
-        The browser will flash the latest hub firmware directly over the serial connection.<br>
-        <span class="text-warning text-xs">Requires Chrome or Edge (Web Serial API).</span>
+    {#if loadingInit}
+      <div class="flex justify-center py-12"><span class="loading loading-spinner"></span></div>
+    {:else if error}
+      <div class="alert alert-error text-sm">{error}</div>
+    {:else}
+
+    <ul class="steps steps-horizontal w-full text-xs">
+      <li class="step {bfStep >= 1 ? 'step-primary' : ''}">Template</li>
+      <li class="step {bfStep >= 2 ? 'step-primary' : ''}">Name</li>
+      <li class="step {bfStep >= 3 ? 'step-primary' : ''}">WiFi</li>
+      <li class="step {bfStep >= 4 ? 'step-primary' : ''}">Flash</li>
+      <li class="step {bfStep >= 5 ? 'step-primary' : ''}">Done</li>
+    </ul>
+
+    {#if bfStep === 1}
+      <div class="flex flex-col gap-3">
+        <div class="text-sm font-semibold">Select a template</div>
+        {#if templates.length === 0}
+          <div class="text-sm text-base-content/50">No templates yet — create one in the Templates view.</div>
+        {:else}
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {#each templates as t}
+              <button
+                class="card p-3 border text-left transition-all
+                  {bfTemplate?.id === t.id ? 'border-primary bg-primary/10' : 'border-base-300 bg-base-200 hover:border-primary/40'}"
+                on:click={() => bfTemplate = t}
+              >
+                <div class="font-semibold text-sm">{t.name || t.id}</div>
+                <div class="text-xs text-base-content/50">{t.board}</div>
+              </button>
+            {/each}
+          </div>
+          <button class="btn btn-primary btn-sm self-end" disabled={!bfTemplate}
+            on:click={() => bfStep = 2}>Next →</button>
+        {/if}
       </div>
 
-      {#if !firmwareAvailable}
-        <div class="alert alert-warning text-sm">
-          No firmware marked as latest. Upload and set a firmware version in the
-          <strong>Firmware</strong> view first.
+    {:else if bfStep === 2}
+      <div class="flex flex-col gap-3">
+        <div class="text-sm font-semibold">Device name <span class="text-base-content/40 font-normal">(e.g. 1/Bedroom)</span></div>
+        <input class="input input-bordered input-sm" placeholder="e.g. 1/Bedroom"
+          bind:value={bfDeviceName} />
+        <div class="flex gap-2 justify-end">
+          <button class="btn btn-ghost btn-sm" on:click={() => bfStep = 1}>← Back</button>
+          <button class="btn btn-primary btn-sm"
+            disabled={!bfDeviceName.trim()}
+            on:click={() => bfStep = 3}>Next →</button>
         </div>
-      {:else}
-        <div class="flex items-center gap-3 p-3 rounded-lg bg-base-200 border border-base-300 text-sm">
-          <span class="text-base-content/50">Firmware to flash:</span>
-          <span class="font-mono font-semibold">{latestVersion}</span>
-        </div>
+      </div>
 
-        {#if browserFlashState === 'done'}
-          <div class="alert alert-success text-sm">
-            Flash complete! The device will reboot into the Matter hub firmware.
-            Use the <strong>Server Flash</strong> tab to provision it with WiFi and device credentials.
-          </div>
-          <div class="alert alert-info text-xs mt-1">
-            Unplug and replug the ESP32, then open the
-            <button class="link link-primary font-semibold" on:click={() => activeTab = 'debug'}>Serial Debug</button>
-            tab to view boot logs.
-          </div>
-          <button class="btn btn-ghost btn-sm self-start"
-            on:click={() => { browserFlashState = 'idle'; browserFlashMsg = ''; }}>
-            Flash another device
-          </button>
+    {:else if bfStep === 3}
+      <div class="flex flex-col gap-3">
+        <div class="text-sm font-semibold">WiFi credentials <span class="text-base-content/40 font-normal">(optional)</span></div>
+        <input class="input input-bordered input-sm" placeholder="WiFi SSID" bind:value={bfSSID} />
+        <input class="input input-bordered input-sm" type="password" placeholder="WiFi password" bind:value={bfPassword} />
 
-        {:else if browserFlashState === 'error'}
-          <div class="alert alert-error text-sm">{browserFlashMsg || 'Flash failed'}</div>
-          <button class="btn btn-ghost btn-sm self-start"
-            on:click={() => { browserFlashState = 'idle'; browserFlashMsg = ''; }}>
-            Try again
-          </button>
-
+        <div class="divider my-1"></div>
+        <div class="text-sm font-semibold">Firmware version</div>
+        {#if firmware.length === 0}
+          <div class="text-sm text-base-content/50">No firmware uploaded — go to the Firmware view first.</div>
         {:else}
-          {#if browserFlashState !== 'idle'}
-            <div class="flex items-center gap-2 text-sm text-base-content/70">
-              <span class="loading loading-spinner loading-xs"></span>
-              {browserFlashMsg}
-            </div>
-          {/if}
-
-          <esp-web-install-button
-            manifest="/api/webflash/manifest.json"
-            on:state-changed={handleInstallEvent}
-          >
-            <button
-              slot="activate"
-              class="btn btn-primary"
-              disabled={browserFlashState !== 'idle'}
-            >
-              Connect &amp; Flash ESP32-C3
-            </button>
-            <span slot="unsupported" class="alert alert-error text-sm">
-              Web Serial is not supported in this browser. Use Chrome or Edge.
-            </span>
-          </esp-web-install-button>
+          <select class="select select-bordered select-sm" bind:value={bfFW}>
+            <option value="">Select version…</option>
+            {#each firmware as f}<option value={f.version}>{f.version}{f.is_latest ? ' (latest)' : ''}</option>{/each}
+          </select>
         {/if}
-      {/if}
-    </div>
+
+        <div class="flex gap-2 justify-end">
+          <button class="btn btn-ghost btn-sm" on:click={() => bfStep = 2}>← Back</button>
+          <button class="btn btn-primary btn-sm"
+            disabled={!bfFW}
+            on:click={() => bfStep = 4}>Next →</button>
+        </div>
+      </div>
+
+    {:else if bfStep === 4}
+      <div class="flex flex-col gap-3">
+        <div class="card bg-base-200 border border-base-300 p-4 text-sm space-y-1">
+          <div><strong>Template:</strong> {bfTemplate.name || bfTemplate.id}</div>
+          <div><strong>Device:</strong> {bfDeviceName}</div>
+          <div><strong>WiFi:</strong> {bfSSID || '— (none)'}</div>
+          <div><strong>Firmware:</strong> {bfFW}</div>
+          <div class="text-xs text-base-content/50 pt-1">
+            Plug your ESP32-C3 into <strong>this computer</strong> via USB, then click Flash Now.
+            <br>Requires Chrome or Edge (Web Serial API).
+          </div>
+        </div>
+        {#if bfFlashError}<div class="alert alert-error text-sm">{bfFlashError}</div>{/if}
+        {#if browserFlashState === 'error'}
+          <div class="alert alert-error text-sm">{browserFlashMsg || 'Flash failed'}</div>
+        {/if}
+        {#if browserFlashState !== 'idle' && browserFlashState !== 'error'}
+          <div class="flex items-center gap-2 text-sm text-base-content/70">
+            <span class="loading loading-spinner loading-xs"></span>
+            {browserFlashMsg}
+          </div>
+        {/if}
+        <div class="flex gap-2 justify-end">
+          <button class="btn btn-ghost btn-sm"
+            disabled={bfFlashing || browserFlashState !== 'idle'}
+            on:click={() => { bfStep = 3; bfToken = ''; browserFlashState = 'idle'; }}>← Back</button>
+
+          {#if !bfToken}
+            <button class="btn btn-warning btn-sm" disabled={bfFlashing} on:click={bfDoFlash}>
+              {#if bfFlashing}<span class="loading loading-spinner loading-xs"></span> Preparing…{:else}⚡ Flash Now{/if}
+            </button>
+          {:else}
+            <esp-web-install-button
+              manifest="/api/webflash/manifest?token={bfToken}"
+              on:state-changed={handleInstallEvent}
+            >
+              <button slot="activate" class="btn btn-warning btn-sm"
+                disabled={browserFlashState !== 'idle'}>
+                {#if browserFlashState !== 'idle'}
+                  <span class="loading loading-spinner loading-xs"></span> Flashing…
+                {:else}
+                  ⚡ Connect &amp; Flash
+                {/if}
+              </button>
+              <span slot="unsupported" class="alert alert-error text-sm">
+                Web Serial not supported — use Chrome or Edge.
+              </span>
+            </esp-web-install-button>
+          {/if}
+        </div>
+      </div>
+
+    {:else if bfStep === 5}
+      <div class="flex flex-col gap-3">
+        <div class="flex items-center gap-3 p-3 rounded-lg border border-success/40 bg-success/10">
+          <span class="text-xl">✓</span>
+          <div class="flex-1">
+            <div class="font-semibold text-sm">{bfDeviceName}</div>
+            <div class="text-xs text-base-content/50">Flash complete — device rebooting with WiFi + Matter config.</div>
+          </div>
+        </div>
+        {#if bfPairing}
+          <div class="flex flex-col gap-3 p-4 rounded-lg border border-base-300 bg-base-200">
+            <div class="font-semibold text-sm">Commission this device</div>
+            <p class="text-xs text-base-content/60">Scan with Apple Home or Google Home. Unplug and replug the device first to enter commissioning mode.</p>
+            {#if bfQrDataUrl}
+              <img src={bfQrDataUrl} alt="Matter QR code" class="rounded border border-base-300 self-center" width="180" />
+            {/if}
+            <div class="font-mono text-xs space-y-1">
+              <div><span class="text-base-content/50">Discriminator:</span> {bfPairing.discriminator}</div>
+              <div><span class="text-base-content/50">Passcode:</span> {bfPairing.passcode}</div>
+            </div>
+          </div>
+        {/if}
+        <div class="alert alert-info text-xs">
+          Unplug and replug, then open the
+          <button class="link link-primary font-semibold" on:click={() => activeTab = 'debug'}>Serial Debug</button>
+          tab to view boot logs.
+        </div>
+        <button class="btn btn-ghost btn-sm self-start mt-2" on:click={bfReset}>Flash another device</button>
+      </div>
+    {/if}
+
+    {/if}
   {/if}
 
   <!-- ── Serial Debug ───────────────────────────────────────────────────────── -->
@@ -416,7 +560,7 @@
 
     {:else if step === 3}
       <div class="flex flex-col gap-3">
-        <div class="text-sm font-semibold">WiFi credentials</div>
+        <div class="text-sm font-semibold">WiFi credentials <span class="text-base-content/40 font-normal">(optional)</span></div>
         <input class="input input-bordered input-sm" placeholder="WiFi SSID" bind:value={wifiSSID} />
         <input class="input input-bordered input-sm" type="password" placeholder="WiFi password" bind:value={wifiPassword} />
 
@@ -448,7 +592,7 @@
         <div class="flex gap-2 justify-end">
           <button class="btn btn-ghost btn-sm" on:click={() => step = 2}>← Back</button>
           <button class="btn btn-primary btn-sm"
-            disabled={!wifiSSID || !selectedPort || !selectedFW}
+            disabled={!selectedPort || !selectedFW}
             on:click={() => step = 4}>Next →</button>
         </div>
       </div>
@@ -460,7 +604,7 @@
           <div><strong>Devices ({deviceNames.filter(n=>n.trim()).length}):</strong> {deviceNames.filter(n=>n.trim()).join(', ')}</div>
           <div><strong>Port:</strong> {selectedPort}</div>
           <div><strong>Firmware:</strong> {selectedFW}</div>
-          <div><strong>WiFi:</strong> {wifiSSID}</div>
+          <div><strong>WiFi:</strong> {wifiSSID || '— (none)'}</div>
         </div>
         {#if flashError}<div class="alert alert-error text-sm">{flashError}</div>{/if}
         <div class="flex gap-2 justify-end">
