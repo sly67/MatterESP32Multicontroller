@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sync"
 	"time"
 
@@ -318,11 +319,18 @@ func serveFlashStatic(embedPath, filename string) http.HandlerFunc {
 	})
 }
 
+// safeVersion rejects version strings that could be used for path traversal.
+var safeVersion = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
+
 func serveLatestFirmwareBin(database *db.Database, firmwareDir string) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fw, err := database.GetLatestFirmware()
 		if err != nil {
 			http.Error(w, "no firmware available", http.StatusServiceUnavailable)
+			return
+		}
+		if !safeVersion.MatchString(fw.Version) {
+			http.Error(w, "invalid firmware version", http.StatusInternalServerError)
 			return
 		}
 		path := filepath.Join(firmwareDir, fw.Version+".bin")
@@ -348,6 +356,10 @@ func serveSessionFirmwareBin(firmwareDir string) http.HandlerFunc {
 
 		if !ok {
 			http.Error(w, "invalid or expired token", http.StatusBadRequest)
+			return
+		}
+		if !safeVersion.MatchString(sess.fwVersion) {
+			http.Error(w, "invalid firmware version", http.StatusInternalServerError)
 			return
 		}
 
