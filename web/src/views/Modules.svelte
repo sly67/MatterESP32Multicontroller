@@ -47,7 +47,7 @@
       if (!match) throw new Error('YAML must contain an "id:" field');
       const id = match[1];
       const nameMatch = yaml.match(/^name:\s*"?([^"\n]+)"?/m);
-      const name = nameMatch ? nameMatch[1] : id;
+      const name = nameMatch ? nameMatch[1].replace(/"$/, '').trim() : id;
       const catMatch = yaml.match(/^category:\s*(\S+)/m);
       const category = catMatch ? catMatch[1] : '';
       await api.post('/api/modules', { id, name, category, yaml_body: yaml });
@@ -56,7 +56,6 @@
       importYaml = '';
     } catch (e) {
       importError = e.message;
-      throw e;
     }
   }
 
@@ -71,6 +70,7 @@
   onClose={() => modalOpen = false} />
 
 <YamlModal title="Import Module YAML" bind:yaml={importYaml} open={importOpen}
+  error={importError}
   onClose={() => { importOpen = false; importError = ''; }}
   onSave={importModule} />
 

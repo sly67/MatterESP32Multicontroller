@@ -13,6 +13,7 @@
 
   let importOpen = false;
   let importYaml = '';
+  let importError = '';
 
   let deleteTarget = null;
 
@@ -33,15 +34,21 @@
   }
 
   async function importTemplate(yaml) {
+    importError = '';
     const idMatch = yaml.match(/^id:\s*(\S+)/m);
-    if (!idMatch) throw new Error('YAML must contain an "id:" field');
+    if (!idMatch) { importError = 'YAML must contain an "id:" field'; return; }
     const id = idMatch[1];
     const nameMatch = yaml.match(/^name:\s*"?([^"\n]+)"?/m);
-    const name = nameMatch ? nameMatch[1] : id;
-    await api.post('/api/templates', { id, name, yaml_body: yaml });
-    templates = await api.get('/api/templates');
-    importOpen = false;
-    importYaml = '';
+    const name = nameMatch ? nameMatch[1].replace(/"$/, '').trim() : id;
+    try {
+      await api.post('/api/templates', { id, name, yaml_body: yaml });
+      templates = await api.get('/api/templates');
+      importOpen = false;
+      importYaml = '';
+      importError = '';
+    } catch (e) {
+      importError = e.message;
+    }
   }
 
   async function doDelete() {
@@ -61,7 +68,8 @@
   onClose={() => modalOpen = false} />
 
 <YamlModal title="Import Template YAML" bind:yaml={importYaml} open={importOpen}
-  onClose={() => { importOpen = false; }}
+  error={importError}
+  onClose={() => { importOpen = false; importError = ''; }}
   onSave={importTemplate} />
 
 {#if deleteTarget}

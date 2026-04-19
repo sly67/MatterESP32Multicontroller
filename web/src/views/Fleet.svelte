@@ -10,6 +10,7 @@
 
   let pairModal = null; // { discriminator, passcode, qr_payload } | null
   let qrDataUrl = '';
+  let pairError = '';
 
   onMount(async () => {
     try {
@@ -32,12 +33,17 @@
   }[s] || 'badge-ghost');
 
   async function openPairModal(device) {
-    const res = await fetch(`/api/devices/${device.id}/pairing`).then(r => r.json());
-    pairModal = res;
-    qrDataUrl = await QRCode.toDataURL(res.qr_payload, { width: 220, margin: 2 });
+    pairError = '';
+    try {
+      const res = await api.get(`/api/devices/${device.id}/pairing`);
+      pairModal = res;
+      qrDataUrl = await QRCode.toDataURL(res.qr_payload, { width: 220, margin: 2 });
+    } catch (e) {
+      pairError = e.message;
+    }
   }
 
-  function closePairModal() { pairModal = null; qrDataUrl = ''; }
+  function closePairModal() { pairModal = null; qrDataUrl = ''; pairError = ''; }
 </script>
 
 <div class="p-6 flex flex-col gap-4">
@@ -51,6 +57,10 @@
     placeholder="Filter by name or status…"
     bind:value={filter}
   />
+
+  {#if pairError}
+    <div class="alert alert-error text-sm">{pairError}</div>
+  {/if}
 
   {#if loading}
     <div class="flex justify-center py-12"><span class="loading loading-spinner"></span></div>
