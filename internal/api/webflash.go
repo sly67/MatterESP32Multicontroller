@@ -1,7 +1,9 @@
 package api
 
 import (
+	"bufio"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
@@ -11,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,15 +21,21 @@ import (
 	godata "github.com/karthangar/matteresp32hub/data"
 	"github.com/karthangar/matteresp32hub/internal/config"
 	"github.com/karthangar/matteresp32hub/internal/db"
+	"github.com/karthangar/matteresp32hub/internal/esphome"
+	"github.com/karthangar/matteresp32hub/internal/library"
 	"github.com/karthangar/matteresp32hub/internal/matter"
 	"github.com/karthangar/matteresp32hub/internal/nvs"
 	"github.com/karthangar/matteresp32hub/internal/yamldef"
 )
 
-// preparedSession holds an NVS binary and firmware version keyed by token.
+// preparedSession holds flash data keyed by token.
+// For Matter sessions: nvsBin + fwVersion are set.
+// For ESPHome sessions: espBin + espBoard are set.
 type preparedSession struct {
 	nvsBin    []byte
 	fwVersion string
+	espBin    []byte
+	espBoard  string
 	createdAt time.Time
 }
 
@@ -71,6 +80,11 @@ func webflashRouter(cfg *config.Config, database *db.Database) func(chi.Router) 
 		r.Get("/nvs", serveWebFlashNVS())
 		r.Get("/firmware", serveSessionFirmwareBin(firmwareDir))
 		r.Post("/prepare", prepareWebFlash(database))
+
+		// ESPHome browser flash
+		r.Post("/esphome-prepare", prepareWebFlashESPHome(database, dataDir))
+		r.Get("/esphome-manifest", serveWebFlashESPHomeManifest())
+		r.Get("/esphome-firmware", serveWebFlashESPHomeFirmware())
 
 		r.Get("/bootloader.bin", serveFlashStatic("flash/esp32c3/bootloader.bin", "bootloader.bin"))
 		r.Get("/partition-table.bin", serveFlashStatic("flash/esp32c3/partition-table.bin", "partition-table.bin"))
@@ -344,6 +358,226 @@ func serveLatestFirmwareBin(database *db.Database, firmwareDir string) http.Hand
 		w.Header().Set("Content-Disposition", `attachment; filename="firmware.bin"`)
 		io.Copy(w, f)
 	})
+}
+
+// boardToChipFamily maps ESPHome board identifiers to esp-web-tools chip families.
+func boardToChipFamily(board string) string {
+	switch board {
+	case "esp32-c3", "esp32-c3-devkitm-1":
+		return "ESP32-C3"
+	case "esp32-s3":
+		return "ESP32-S3"
+	case "esp32-s2":
+		return "ESP32-S2"
+	case "esp32-h2":
+		return "ESP32-H2"
+	default:
+		return "ESP32"
+	}
+}
+
+// prepareWebFlashESPHome compiles ESPHome firmware for browser flashing.
+// Streams ndjson log lines during compile, then emits a final {ok,token} or {ok:false,error} line.
+func prepareWebFlashESPHome(database *db.Database, dataDir string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Board         string                    `json:"board"`
+			Components    []esphome.ComponentConfig  `json:"components"`
+			DeviceName    string                    `json:"device_name"`
+			WiFiSSID      string                    `json:"wifi_ssid"`
+			WiFiPassword  string                    `json:"wifi_password"`
+			HubURL        string                    `json:"hub_url"`
+			HAIntegration bool                      `json:"ha_integration"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid JSON", http.StatusBadRequest)
+			return
+		}
+		if req.DeviceName == "" || req.Board == "" || req.HubURL == "" {
+			http.Error(w, "device_name, board, hub_url are required", http.StatusBadRequest)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		w.Header().Set("Transfer-Encoding", "chunked")
+		flusher, canFlush := w.(http.Flusher)
+
+		sendLine := func(v interface{}) {
+			json.NewEncoder(w).Encode(v) //nolint:errcheck
+			if canFlush {
+				flusher.Flush()
+			}
+		}
+
+		mods, err := library.LoadModules()
+		if err != nil {
+			sendLine(map[string]interface{}{"ok": false, "error": "load modules: " + err.Error()})
+			return
+		}
+		modMap := make(map[string]*yamldef.Module, len(mods))
+		for _, m := range mods {
+			modMap[m.ID] = m
+		}
+
+		deviceID, err := randomHex(6)
+		if err != nil {
+			sendLine(map[string]interface{}{"ok": false, "error": "device id: " + err.Error()})
+			return
+		}
+
+		otaBuf := make([]byte, 16)
+		if _, err := rand.Read(otaBuf); err != nil {
+			sendLine(map[string]interface{}{"ok": false, "error": "ota password: " + err.Error()})
+			return
+		}
+		otaPassword := hex.EncodeToString(otaBuf)
+
+		var apiKey string
+		if req.HAIntegration {
+			keyBuf := make([]byte, 32)
+			if _, err := rand.Read(keyBuf); err != nil {
+				sendLine(map[string]interface{}{"ok": false, "error": "api key: " + err.Error()})
+				return
+			}
+			apiKey = base64.StdEncoding.EncodeToString(keyBuf)
+		}
+
+		yamlStr, err := esphome.Assemble(esphome.Config{
+			Board:         req.Board,
+			DeviceName:    req.DeviceName,
+			DeviceID:      deviceID,
+			WiFiSSID:      req.WiFiSSID,
+			WiFiPassword:  req.WiFiPassword,
+			HubURL:        req.HubURL,
+			HAIntegration: req.HAIntegration,
+			APIKey:        apiKey,
+			OTAPassword:   otaPassword,
+			Components:    req.Components,
+		}, modMap)
+		if err != nil {
+			sendLine(map[string]interface{}{"ok": false, "error": "assemble YAML: " + err.Error()})
+			return
+		}
+
+		builder, err := esphome.NewBuilder(dataDir + "/esphome-cache")
+		if err != nil {
+			sendLine(map[string]interface{}{"ok": false, "error": "builder: " + err.Error()})
+			return
+		}
+		defer builder.Close()
+
+		pr, pw := io.Pipe()
+		type binResult struct {
+			bin []byte
+			err error
+		}
+		ch := make(chan binResult, 1)
+		go func() {
+			bin, err := builder.Compile(r.Context(), req.DeviceName, yamlStr, pw)
+			pw.Close()
+			ch <- binResult{bin, err}
+		}()
+
+		scanner := bufio.NewScanner(pr)
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			if line != "" {
+				sendLine(map[string]string{"log": line})
+			}
+		}
+
+		res := <-ch
+		if res.err != nil {
+			sendLine(map[string]interface{}{"ok": false, "error": "compile: " + res.err.Error()})
+			return
+		}
+
+		cfgJSON, _ := json.Marshal(struct {
+			Board         string                    `json:"board"`
+			HAIntegration bool                      `json:"ha_integration"`
+			OTAPassword   string                    `json:"ota_password"`
+			HubURL        string                    `json:"hub_url"`
+			Components    []esphome.ComponentConfig `json:"components"`
+		}{req.Board, req.HAIntegration, otaPassword, req.HubURL, req.Components})
+
+		if err := database.CreateDevice(db.Device{
+			ID:            deviceID,
+			Name:          req.DeviceName,
+			FirmwareType:  "esphome",
+			ESPHomeConfig: string(cfgJSON),
+			ESPHomeAPIKey: apiKey,
+			PSK:           []byte{},
+		}); err != nil {
+			sendLine(map[string]interface{}{"ok": false, "error": "register device: " + err.Error()})
+			return
+		}
+
+		token, err := randomHex(16)
+		if err != nil {
+			sendLine(map[string]interface{}{"ok": false, "error": "token: " + err.Error()})
+			return
+		}
+		sessionMu.Lock()
+		sessions[token] = &preparedSession{
+			espBin:    res.bin,
+			espBoard:  req.Board,
+			createdAt: time.Now(),
+		}
+		sessionMu.Unlock()
+
+		sendLine(map[string]interface{}{"ok": true, "token": token, "device_id": deviceID})
+	}
+}
+
+func serveWebFlashESPHomeManifest() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token := r.URL.Query().Get("token")
+		sessionMu.Lock()
+		sess, ok := sessions[token]
+		sessionMu.Unlock()
+		if !ok || len(sess.espBin) == 0 {
+			http.Error(w, "invalid or expired token", http.StatusBadRequest)
+			return
+		}
+		type part struct {
+			Path   string `json:"path"`
+			Offset int    `json:"offset"`
+		}
+		type build struct {
+			ChipFamily string `json:"chipFamily"`
+			Parts      []part `json:"parts"`
+		}
+		manifest := struct {
+			Name    string  `json:"name"`
+			Version string  `json:"version"`
+			Builds  []build `json:"builds"`
+		}{
+			Name:    "ESPHome Firmware",
+			Version: "esphome",
+			Builds: []build{{
+				ChipFamily: boardToChipFamily(sess.espBoard),
+				Parts:      []part{{Path: fmt.Sprintf("/api/webflash/esphome-firmware?token=%s", token), Offset: 0x0}},
+			}},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(manifest) //nolint:errcheck
+	}
+}
+
+func serveWebFlashESPHomeFirmware() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token := r.URL.Query().Get("token")
+		sessionMu.Lock()
+		sess, ok := sessions[token]
+		sessionMu.Unlock()
+		if !ok || len(sess.espBin) == 0 {
+			http.Error(w, "invalid or expired token", http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Content-Disposition", `attachment; filename="firmware-factory.bin"`)
+		w.Write(sess.espBin) //nolint:errcheck
+	}
 }
 
 func serveSessionFirmwareBin(firmwareDir string) http.HandlerFunc {

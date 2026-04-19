@@ -81,6 +81,106 @@
     bfPairing = null; bfQrDataUrl = '';
   }
 
+  // ── Browser Flash — ESPHome path ───────────────────────────────────────────
+  let bfFirmwareType = 'matter'; // 'matter' | 'esphome'
+  let bfEspStep = 1;             // 1=board 2=components 3=config 4=compile 5=flash 6=done
+  let bfEspBoard = 'esp32-c3';
+  let bfEspComponents = [];
+  let bfEspDeviceName = '';
+  let bfEspWifiSSID = '';
+  let bfEspWifiPassword = '';
+  let bfEspHubURL = window.location.origin;
+  let bfEspHA = false;
+  let bfEspCompiling = false;
+  let bfEspError = '';
+  let bfEspLogs = [];
+  let bfEspToken = '';
+  let bfEspFlashState = 'idle'; // idle | connecting | writing | done | error
+  let bfEspFlashMsg = '';
+  let bfEspModules = [];
+
+  async function loadBfEspModules() {
+    try {
+      bfEspModules = await api.get('/api/modules?esphome=true');
+    } catch (e) {
+      bfEspError = 'Failed to load modules: ' + e.message;
+    }
+  }
+
+  function bfEspAddComponent(moduleId) {
+    const mod = bfEspModules.find(m => m.id === moduleId);
+    if (!mod) return;
+    const pins = {};
+    (mod.io || []).forEach(p => { pins[p.id] = ''; });
+    bfEspComponents = [...bfEspComponents, { type: moduleId, name: mod.name, pins }];
+  }
+
+  function bfEspRemoveComponent(i) {
+    bfEspComponents = bfEspComponents.filter((_, idx) => idx !== i);
+  }
+
+  async function bfEspDoCompile() {
+    bfEspError = '';
+    bfEspCompiling = true;
+    bfEspLogs = [];
+    bfEspToken = '';
+    try {
+      const res = await fetch('/api/webflash/esphome-prepare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          board:          bfEspBoard,
+          components:     bfEspComponents,
+          device_name:    bfEspDeviceName,
+          wifi_ssid:      bfEspWifiSSID,
+          wifi_password:  bfEspWifiPassword,
+          hub_url:        bfEspHubURL,
+          ha_integration: bfEspHA,
+        }),
+      });
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const obj = JSON.parse(line);
+            if (obj.log !== undefined) bfEspLogs = [...bfEspLogs, obj.log];
+            else if (obj.ok) { bfEspToken = obj.token; bfEspStep = 5; }
+            else bfEspError = obj.error || 'compile failed';
+          } catch {}
+        }
+      }
+    } catch (e) {
+      bfEspError = e.message;
+    } finally {
+      bfEspCompiling = false;
+    }
+  }
+
+  function handleBfEspInstallEvent(e) {
+    const state = e.detail?.state;
+    if (!state) return;
+    if (state === 'finished') { bfEspFlashState = 'done'; bfEspStep = 6; }
+    else if (state === 'error') { bfEspFlashState = 'error'; bfEspFlashMsg = e.detail?.message || 'Flash failed'; }
+    else if (state === 'initializing' || state === 'preparing') { bfEspFlashState = 'connecting'; bfEspFlashMsg = 'Connecting…'; }
+    else if (state === 'writing') { bfEspFlashState = 'writing'; bfEspFlashMsg = e.detail?.details || 'Writing…'; }
+  }
+
+  function bfEspReset() {
+    bfFirmwareType = 'matter';
+    bfEspStep = 1; bfEspBoard = 'esp32-c3'; bfEspComponents = [];
+    bfEspDeviceName = ''; bfEspWifiSSID = ''; bfEspWifiPassword = '';
+    bfEspHA = false; bfEspCompiling = false; bfEspError = '';
+    bfEspLogs = []; bfEspToken = ''; bfEspFlashState = 'idle'; bfEspFlashMsg = '';
+  }
+
   // ── Server Flash (existing wizard) ────────────────────────────────────────
   let step = 1;
   let templates = [];
@@ -376,6 +476,15 @@
       <div class="alert alert-error text-sm">{error}</div>
     {:else}
 
+    <!-- Firmware type toggle -->
+    <div class="flex gap-2">
+      <button class="btn btn-sm {bfFirmwareType === 'matter' ? 'btn-primary' : 'btn-ghost'}"
+        on:click={() => { bfFirmwareType = 'matter'; }}>Matter</button>
+      <button class="btn btn-sm {bfFirmwareType === 'esphome' ? 'btn-primary' : 'btn-ghost'}"
+        on:click={() => { bfFirmwareType = 'esphome'; loadBfEspModules(); }}>ESPHome</button>
+    </div>
+
+    {#if bfFirmwareType === 'matter'}
     <ul class="steps steps-horizontal w-full text-xs">
       <li class="step {bfStep >= 1 ? 'step-primary' : ''}">Template</li>
       <li class="step {bfStep >= 2 ? 'step-primary' : ''}">Name</li>
@@ -527,6 +636,146 @@
         </div>
         <button class="btn btn-ghost btn-sm self-start mt-2" on:click={bfReset}>Flash another device</button>
       </div>
+    {/if}
+    {/if}
+
+    <!-- ESPHome browser flash wizard -->
+    {#if bfFirmwareType === 'esphome'}
+      <ul class="steps steps-horizontal w-full text-xs">
+        <li class="step {bfEspStep >= 1 ? 'step-primary' : ''}">Board</li>
+        <li class="step {bfEspStep >= 2 ? 'step-primary' : ''}">Components</li>
+        <li class="step {bfEspStep >= 3 ? 'step-primary' : ''}">Config</li>
+        <li class="step {bfEspStep >= 4 ? 'step-primary' : ''}">Compile</li>
+        <li class="step {bfEspStep >= 5 ? 'step-primary' : ''}">Flash</li>
+        <li class="step {bfEspStep >= 6 ? 'step-primary' : ''}">Done</li>
+      </ul>
+
+      {#if bfEspStep === 1}
+        <div class="flex flex-col gap-3">
+          <div class="text-sm font-semibold">Select board</div>
+          {#each ['esp32-c3', 'esp32-h2', 'esp32', 'esp32-s3'] as board}
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" class="radio radio-sm" bind:group={bfEspBoard} value={board} />
+              <span class="text-sm font-mono">{board}</span>
+            </label>
+          {/each}
+          <div class="flex gap-2 mt-2">
+            <button class="btn btn-primary btn-sm" on:click={() => bfEspStep = 2}>Next</button>
+          </div>
+        </div>
+
+      {:else if bfEspStep === 2}
+        <div class="flex flex-col gap-3">
+          <div class="text-sm font-semibold">Add components</div>
+          {#each bfEspComponents as comp, i}
+            <div class="border border-base-300 rounded p-3 flex flex-col gap-2">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-semibold">{comp.type}</span>
+                <button class="btn btn-ghost btn-xs" on:click={() => bfEspRemoveComponent(i)}>✕</button>
+              </div>
+              <input class="input input-bordered input-sm w-full" placeholder="Name (e.g. Room Temp)"
+                bind:value={comp.name} />
+              {#each Object.keys(comp.pins) as role}
+                <label class="text-xs flex items-center gap-2">
+                  <span class="w-12 font-mono">{role}</span>
+                  <input class="input input-bordered input-xs flex-1" placeholder="GPIO4"
+                    bind:value={comp.pins[role]} />
+                </label>
+              {/each}
+            </div>
+          {/each}
+          <select class="select select-bordered select-sm" on:change={e => { bfEspAddComponent(e.target.value); e.target.value = ''; }}>
+            <option value="">+ Add component…</option>
+            {#each bfEspModules as m}
+              <option value={m.id}>{m.name}</option>
+            {/each}
+          </select>
+          <div class="flex gap-2 mt-2">
+            <button class="btn btn-ghost btn-sm" on:click={() => bfEspStep = 1}>Back</button>
+            <button class="btn btn-primary btn-sm" disabled={bfEspComponents.length === 0}
+              on:click={() => bfEspStep = 3}>Next</button>
+          </div>
+        </div>
+
+      {:else if bfEspStep === 3}
+        <div class="flex flex-col gap-3">
+          <div class="text-sm font-semibold">Device configuration</div>
+          <input class="input input-bordered input-sm" placeholder="Device name" bind:value={bfEspDeviceName} />
+          <input class="input input-bordered input-sm" placeholder="WiFi SSID" bind:value={bfEspWifiSSID} />
+          <input class="input input-bordered input-sm" type="password" placeholder="WiFi password" bind:value={bfEspWifiPassword} />
+          <input class="input input-bordered input-sm" placeholder="Hub URL (e.g. http://192.168.1.10:48060)" bind:value={bfEspHubURL} />
+          <label class="flex items-center gap-2 text-sm cursor-pointer">
+            <input type="checkbox" class="checkbox checkbox-sm" bind:checked={bfEspHA} />
+            Home Assistant integration (generates API encryption key)
+          </label>
+          {#if bfEspError}<div class="alert alert-error text-xs">{bfEspError}</div>{/if}
+          <div class="flex gap-2 mt-2">
+            <button class="btn btn-ghost btn-sm" on:click={() => bfEspStep = 2}>Back</button>
+            <button class="btn btn-primary btn-sm"
+              disabled={!bfEspDeviceName || !bfEspWifiSSID}
+              on:click={() => { bfEspStep = 4; bfEspDoCompile(); }}>Compile</button>
+          </div>
+        </div>
+
+      {:else if bfEspStep === 4}
+        <div class="flex flex-col gap-3">
+          <div class="text-sm font-semibold">
+            {bfEspCompiling ? 'Compiling… (may take several minutes on first flash)' : 'Compilation done — plug in your device and flash'}
+          </div>
+          <div class="bg-base-300 rounded p-2 h-48 overflow-y-auto font-mono text-xs">
+            {#each bfEspLogs as line}<div>{line}</div>{/each}
+            {#if bfEspCompiling}<div class="animate-pulse">▋</div>{/if}
+          </div>
+          {#if bfEspError}<div class="alert alert-error text-xs">{bfEspError}</div>{/if}
+        </div>
+
+      {:else if bfEspStep === 5}
+        <div class="flex flex-col gap-3">
+          <div class="alert alert-success text-sm">Firmware compiled — plug your ESP32 into <strong>this computer</strong> via USB, then click Connect &amp; Flash.</div>
+          {#if bfEspFlashState === 'error'}
+            <div class="alert alert-error text-sm">{bfEspFlashMsg || 'Flash failed'}</div>
+          {/if}
+          {#if bfEspFlashState !== 'idle' && bfEspFlashState !== 'error' && bfEspFlashState !== 'done'}
+            <div class="flex items-center gap-2 text-sm text-base-content/70">
+              <span class="loading loading-spinner loading-xs"></span>
+              {bfEspFlashMsg}
+            </div>
+          {/if}
+          <div class="flex gap-2 justify-end">
+            <esp-web-install-button
+              manifest="/api/webflash/esphome-manifest?token={bfEspToken}"
+              on:state-changed={handleBfEspInstallEvent}
+            >
+              <button slot="activate" class="btn btn-warning btn-sm"
+                disabled={bfEspFlashState !== 'idle'}>
+                {#if bfEspFlashState !== 'idle'}
+                  <span class="loading loading-spinner loading-xs"></span> Flashing…
+                {:else}
+                  ⚡ Connect &amp; Flash
+                {/if}
+              </button>
+              <span slot="unsupported" class="alert alert-error text-sm">
+                Web Serial not supported — use Chrome or Edge.
+              </span>
+            </esp-web-install-button>
+          </div>
+        </div>
+
+      {:else if bfEspStep === 6}
+        <div class="flex flex-col gap-3">
+          <div class="flex items-center gap-3 p-3 rounded-lg border border-success/40 bg-success/10">
+            <span class="text-xl">✓</span>
+            <div class="flex-1">
+              <div class="font-semibold text-sm">{bfEspDeviceName}</div>
+              <div class="text-xs text-base-content/50">ESPHome flash complete — device rebooting.</div>
+            </div>
+          </div>
+          {#if bfEspHA}
+            <div class="text-xs">The ESPHome API encryption key has been stored. Use the <strong>ESPHome Key</strong> button in the Fleet view to retrieve it for Home Assistant pairing.</div>
+          {/if}
+          <button class="btn btn-ghost btn-sm self-start mt-2" on:click={bfEspReset}>Flash another device</button>
+        </div>
+      {/if}
     {/if}
 
     {/if}
