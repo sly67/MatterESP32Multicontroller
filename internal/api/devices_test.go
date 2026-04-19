@@ -86,3 +86,87 @@ func TestDevices_GetPairing_NotFound(t *testing.T) {
 	srv.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusNotFound, w.Code)
 }
+
+func TestDevices_Heartbeat_ESPHome(t *testing.T) {
+	srv := newTestServer(t)
+	database := getDatabase(t, srv)
+
+	require.NoError(t, database.CreateDevice(db.Device{
+		ID: "dev-esph", Name: "Sensor", FirmwareType: "esphome", PSK: []byte{},
+	}))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/devices/dev-esph/heartbeat", nil)
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNoContent, w.Code)
+
+	got, err := database.GetDevice("dev-esph")
+	require.NoError(t, err)
+	assert.Equal(t, "online", got.Status)
+}
+
+func TestDevices_Heartbeat_MatterDeviceReturns404(t *testing.T) {
+	srv := newTestServer(t)
+	database := getDatabase(t, srv)
+
+	require.NoError(t, database.CreateTemplate(db.TemplateRow{
+		ID: "tpl-1", Name: "T1", Board: "esp32-c3", YAMLBody: "id: tpl-1\n",
+	}))
+	require.NoError(t, database.CreateDevice(db.Device{
+		ID: "dev-matter", Name: "Light", TemplateID: "tpl-1",
+		FirmwareType: "matter", PSK: make([]byte, 32),
+	}))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/devices/dev-matter/heartbeat", nil)
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+}
+
+func TestDevices_Heartbeat_MissingDeviceReturns404(t *testing.T) {
+	srv := newTestServer(t)
+	req := httptest.NewRequest(http.MethodPost, "/api/devices/missing/heartbeat", nil)
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusNotFound, w.Code)
+}
+
+func TestDevices_ESPHomeKey(t *testing.T) {
+	srv := newTestServer(t)
+	database := getDatabase(t, srv)
+
+	require.NoError(t, database.CreateDevice(db.Device{
+		ID: "dev-esph", Name: "Sensor", FirmwareType: "esphome",
+		ESPHomeAPIKey: "apikey123",
+		ESPHomeConfig: `{"ota_password":"otapass"}`,
+		PSK:           []byte{},
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/devices/dev-esph/esphome-key", nil)
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var body map[string]string
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
+	assert.Equal(t, "apikey123", body["api_key"])
+	assert.Equal(t, "otapass", body["ota_password"])
+}
+
+func TestDevices_ESPHomeKey_NoKey(t *testing.T) {
+	srv := newTestServer(t)
+	database := getDatabase(t, srv)
+
+	require.NoError(t, database.CreateDevice(db.Device{
+		ID: "dev-esph", Name: "Sensor", FirmwareType: "esphome",
+		ESPHomeConfig: `{"ota_password":"otapass"}`,
+		PSK:           []byte{},
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/devices/dev-esph/esphome-key", nil)
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusNotFound, w.Code)
+}
