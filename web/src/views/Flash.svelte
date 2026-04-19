@@ -236,7 +236,7 @@
   async function disconnect() {
     if (dbgAbort) { dbgAbort.abort(); dbgAbort = null; }
     if (dbgPipeDone) { await dbgPipeDone; dbgPipeDone = null; }
-    try { await dbgPort.close(); } catch (_) {}
+    try { await dbgPort?.close(); } catch (_) {}
     dbgPort = null;
     dbgStatus = 'disconnected';
   }
