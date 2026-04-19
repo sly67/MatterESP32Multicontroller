@@ -1,14 +1,19 @@
 package api
 
 import (
+	"bufio"
 	"encoding/json"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/karthangar/matteresp32hub/internal/db"
+	"github.com/karthangar/matteresp32hub/internal/esphome"
 	"github.com/karthangar/matteresp32hub/internal/flash"
+	"github.com/karthangar/matteresp32hub/internal/library"
 	"github.com/karthangar/matteresp32hub/internal/usb"
 	"github.com/karthangar/matteresp32hub/internal/yamldef"
 )
@@ -17,6 +22,7 @@ func flashRouter(database *db.Database) func(chi.Router) {
 	return func(r chi.Router) {
 		r.Get("/ports", listPorts)
 		r.Post("/run", runFlash(database))
+		r.Post("/esphome", runESPHomeFlash(database))
 	}
 }
 
@@ -102,5 +108,93 @@ func runFlash(database *db.Database) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(results)
+	}
+}
+
+func runESPHomeFlash(database *db.Database) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Port          string                   `json:"port"`
+			DeviceName    string                   `json:"device_name"`
+			WiFiSSID      string                   `json:"wifi_ssid"`
+			WiFiPassword  string                   `json:"wifi_password"`
+			HubURL        string                   `json:"hub_url"`
+			Board         string                   `json:"board"`
+			HAIntegration bool                     `json:"ha_integration"`
+			Components    []esphome.ComponentConfig `json:"components"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid JSON", http.StatusBadRequest)
+			return
+		}
+		if req.Port == "" || req.DeviceName == "" || req.Board == "" || req.HubURL == "" {
+			http.Error(w, "port, device_name, board, hub_url are required", http.StatusBadRequest)
+			return
+		}
+
+		mods, err := library.LoadModules()
+		if err != nil {
+			http.Error(w, "load modules: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		modMap := make(map[string]*yamldef.Module, len(mods))
+		for _, m := range mods {
+			modMap[m.ID] = m
+		}
+
+		dataDir := os.Getenv("DATA_DIR")
+		if dataDir == "" {
+			dataDir = "./data"
+		}
+		builder, err := esphome.NewBuilder(dataDir + "/esphome-cache")
+		if err != nil {
+			http.Error(w, "builder init: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer builder.Close()
+
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		w.Header().Set("Transfer-Encoding", "chunked")
+		flusher, canFlush := w.(http.Flusher)
+
+		pr, pw := io.Pipe()
+		done := make(chan flash.Result, 1)
+		go func() {
+			result := flash.FlashESPHomeDevice(database, builder, modMap, flash.ESPHomeRequest{
+				Ctx:           r.Context(),
+				Port:          req.Port,
+				DeviceName:    req.DeviceName,
+				WiFiSSID:      req.WiFiSSID,
+				WiFiPassword:  req.WiFiPassword,
+				HubURL:        req.HubURL,
+				Board:         req.Board,
+				HAIntegration: req.HAIntegration,
+				Components:    req.Components,
+			}, pw)
+			pw.Close()
+			done <- result
+		}()
+
+		scanner := bufio.NewScanner(pr)
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			if line == "" {
+				continue
+			}
+			json.NewEncoder(w).Encode(map[string]string{"log": line}) //nolint:errcheck
+			if canFlush {
+				flusher.Flush()
+			}
+		}
+
+		result := <-done
+		if result.Error != nil {
+			json.NewEncoder(w).Encode(map[string]interface{}{"ok": false, "error": result.Error.Error()}) //nolint:errcheck
+		} else {
+			json.NewEncoder(w).Encode(map[string]interface{}{"ok": true, "device_id": result.DeviceID, "name": result.Name}) //nolint:errcheck
+		}
+		if canFlush {
+			flusher.Flush()
+		}
 	}
 }
