@@ -427,6 +427,7 @@
             <div class="font-mono text-xs space-y-1">
               <div><span class="text-base-content/50">Discriminator:</span> {bfPairing.discriminator}</div>
               <div><span class="text-base-content/50">Passcode:</span> {bfPairing.passcode}</div>
+              <div class="break-all"><span class="text-base-content/50">QR payload:</span> {bfPairing.qr_payload}</div>
             </div>
           </div>
         {/if}
