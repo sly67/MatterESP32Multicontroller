@@ -18,8 +18,11 @@ func TestBuilder_New(t *testing.T) {
 }
 
 func TestBuilder_Compile_Integration(t *testing.T) {
+	if os.Getenv("ESPHOME_INTEGRATION_TEST") == "" {
+		t.Skip("set ESPHOME_INTEGRATION_TEST=1 to run (requires Docker + downloads ~500MB)")
+	}
 	if _, err := os.Stat("/var/run/docker.sock"); os.IsNotExist(err) {
-		t.Skip("Docker socket not available — skipping integration test")
+		t.Skip("Docker socket not available")
 	}
 	b, err := esphome.NewBuilder(t.TempDir())
 	require.NoError(t, err)

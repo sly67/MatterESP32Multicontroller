@@ -155,6 +155,95 @@
     selectedPort = ''; selectedFW = latestVersion;
   }
 
+  // ── ESPHome flash path ─────────────────────────────────────────────────────
+  let firmwareType = 'matter'; // 'matter' | 'esphome'
+  let espStep = 1;             // 1=board 2=components 3=config 4=flash 6=done
+  let espBoard = 'esp32-c3';
+  let espComponents = [];      // [{type, name, pins: {ROLE: 'GPIO4'}}]
+  let espDeviceName = '';
+  let espWifiSSID = '';
+  let espWifiPassword = '';
+  let espHubURL = window.location.origin;
+  let espHA = false;
+  let espFlashing = false;
+  let espFlashError = '';
+  let espLogs = [];
+  let espResult = null;        // {ok, device_id, name, error} | null
+  let espModules = [];         // loaded from /api/modules?esphome=true
+
+  async function loadESPHomeModules() {
+    try {
+      espModules = await api.get('/api/modules?esphome=true');
+    } catch (e) {
+      espFlashError = 'Failed to load modules: ' + e.message;
+    }
+  }
+
+  function espAddComponent(moduleId) {
+    const mod = espModules.find(m => m.id === moduleId);
+    if (!mod) return;
+    const pins = {};
+    (mod.io || []).forEach(p => { pins[p.id] = ''; });
+    espComponents = [...espComponents, { type: moduleId, name: mod.name, pins }];
+  }
+
+  function espRemoveComponent(i) {
+    espComponents = espComponents.filter((_, idx) => idx !== i);
+  }
+
+  async function espDoFlash() {
+    espFlashError = '';
+    espFlashing = true;
+    espLogs = [];
+    espResult = null;
+    try {
+      const res = await fetch('/api/flash/esphome', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          port:           selectedPort,
+          device_name:    espDeviceName,
+          wifi_ssid:      espWifiSSID,
+          wifi_password:  espWifiPassword,
+          hub_url:        espHubURL,
+          board:          espBoard,
+          ha_integration: espHA,
+          components:     espComponents,
+        }),
+      });
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const obj = JSON.parse(line);
+            if (obj.log !== undefined) espLogs = [...espLogs, obj.log];
+            else espResult = obj;
+          } catch {}
+        }
+      }
+      espStep = 6;
+    } catch (e) {
+      espFlashError = e.message;
+    } finally {
+      espFlashing = false;
+    }
+  }
+
+  function espReset() {
+    espStep = 1; espBoard = 'esp32-c3'; espComponents = [];
+    espDeviceName = ''; espWifiSSID = ''; espWifiPassword = '';
+    espHA = false; espFlashing = false; espFlashError = '';
+    espLogs = []; espResult = null; firmwareType = 'matter';
+  }
+
   // ── Serial Debug ───────────────────────────────────────────────────────────
   const BAUD_RATES = [74880, 115200, 921600];
   const LOG_MAX_LINES = 1000;
@@ -517,6 +606,17 @@
     </ul>
 
     {#if step === 1}
+      <!-- Firmware type selector — shown at top of step 1 -->
+      <div class="flex gap-2 mb-4">
+        <button class="btn btn-sm {firmwareType === 'matter' ? 'btn-primary' : 'btn-ghost'}"
+          on:click={() => { firmwareType = 'matter'; espStep = 1; }}>Matter</button>
+        <button class="btn btn-sm {firmwareType === 'esphome' ? 'btn-primary' : 'btn-ghost'}"
+          on:click={() => { firmwareType = 'esphome'; loadESPHomeModules(); }}>ESPHome</button>
+      </div>
+    {/if}
+
+    {#if firmwareType === 'matter'}
+    {#if step === 1}
       <div class="flex flex-col gap-3">
         <div class="text-sm font-semibold">Select a template</div>
         {#if templates.length === 0}
@@ -631,6 +731,113 @@
         {/each}
         <button class="btn btn-ghost btn-sm self-start mt-2" on:click={reset}>Flash more devices</button>
       </div>
+    {/if}
+    {/if}
+
+    <!-- ESPHome wizard steps -->
+    {#if firmwareType === 'esphome'}
+
+      {#if espStep === 1}
+        <!-- Step 1: Board selection -->
+        <div class="flex flex-col gap-3">
+          <div class="text-sm font-semibold">Select board</div>
+          {#each ['esp32-c3', 'esp32-h2', 'esp32', 'esp32-s3'] as board}
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" class="radio radio-sm" bind:group={espBoard} value={board} />
+              <span class="text-sm font-mono">{board}</span>
+            </label>
+          {/each}
+          <div class="flex gap-2 mt-2">
+            <button class="btn btn-primary btn-sm" on:click={() => espStep = 2}>Next</button>
+          </div>
+        </div>
+
+      {:else if espStep === 2}
+        <!-- Step 2: Component builder -->
+        <div class="flex flex-col gap-3">
+          <div class="text-sm font-semibold">Add components</div>
+          {#each espComponents as comp, i}
+            <div class="border border-base-300 rounded p-3 flex flex-col gap-2">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-semibold">{comp.type}</span>
+                <button class="btn btn-ghost btn-xs" on:click={() => espRemoveComponent(i)}>✕</button>
+              </div>
+              <input class="input input-bordered input-sm w-full" placeholder="Name (e.g. Room Temp)"
+                bind:value={comp.name} />
+              {#each Object.keys(comp.pins) as role}
+                <label class="text-xs flex items-center gap-2">
+                  <span class="w-12 font-mono">{role}</span>
+                  <input class="input input-bordered input-xs flex-1" placeholder="GPIO4"
+                    bind:value={comp.pins[role]} />
+                </label>
+              {/each}
+            </div>
+          {/each}
+          <select class="select select-bordered select-sm" on:change={e => { espAddComponent(e.target.value); e.target.value = ''; }}>
+            <option value="">+ Add component…</option>
+            {#each espModules as m}
+              <option value={m.id}>{m.name}</option>
+            {/each}
+          </select>
+          <div class="flex gap-2 mt-2">
+            <button class="btn btn-ghost btn-sm" on:click={() => espStep = 1}>Back</button>
+            <button class="btn btn-primary btn-sm" disabled={espComponents.length === 0}
+              on:click={() => espStep = 3}>Next</button>
+          </div>
+        </div>
+
+      {:else if espStep === 3}
+        <!-- Step 3: Device config -->
+        <div class="flex flex-col gap-3">
+          <div class="text-sm font-semibold">Device configuration</div>
+          <input class="input input-bordered input-sm" placeholder="Device name" bind:value={espDeviceName} />
+          <input class="input input-bordered input-sm" placeholder="WiFi SSID" bind:value={espWifiSSID} />
+          <input class="input input-bordered input-sm" type="password" placeholder="WiFi password" bind:value={espWifiPassword} />
+          <input class="input input-bordered input-sm" placeholder="Hub URL (e.g. http://192.168.1.10:48060)" bind:value={espHubURL} />
+          <label class="flex items-center gap-2 text-sm cursor-pointer">
+            <input type="checkbox" class="checkbox checkbox-sm" bind:checked={espHA} />
+            Home Assistant integration (generates API encryption key)
+          </label>
+          {#if espFlashError}<div class="alert alert-error text-xs">{espFlashError}</div>{/if}
+          <div class="flex gap-2 mt-2">
+            <button class="btn btn-ghost btn-sm" on:click={() => espStep = 2}>Back</button>
+            <button class="btn btn-primary btn-sm"
+              disabled={!espDeviceName || !espWifiSSID || !selectedPort}
+              on:click={() => { espStep = 4; espDoFlash(); }}>Flash</button>
+          </div>
+          {#if !selectedPort}
+            <div class="text-xs text-warning">Select a USB port in WiFi &amp; Port step first.</div>
+          {/if}
+        </div>
+
+      {:else if espStep === 4}
+        <!-- Step 4: Compile + flash progress -->
+        <div class="flex flex-col gap-3">
+          <div class="text-sm font-semibold">
+            {espFlashing ? 'Compiling + flashing… (may take several minutes on first flash)' : 'Done'}
+          </div>
+          <div class="bg-base-300 rounded p-2 h-48 overflow-y-auto font-mono text-xs">
+            {#each espLogs as line}<div>{line}</div>{/each}
+            {#if espFlashing}<div class="animate-pulse">▋</div>{/if}
+          </div>
+          {#if espFlashError}<div class="alert alert-error text-xs">{espFlashError}</div>{/if}
+        </div>
+
+      {:else if espStep === 5 || espStep === 6}
+        <!-- Step 6: Done -->
+        <div class="flex flex-col gap-3">
+          {#if espResult?.ok}
+            <div class="alert alert-success text-sm">Device flashed successfully — {espResult.name}</div>
+            {#if espHA}
+              <div class="text-xs">The ESPHome API encryption key has been stored. Use the <strong>ESPHome Key</strong> button in the Fleet view to retrieve it for Home Assistant pairing.</div>
+            {/if}
+          {:else if espResult}
+            <div class="alert alert-error text-sm">{espResult.error}</div>
+          {/if}
+          <button class="btn btn-ghost btn-sm self-start" on:click={espReset}>Flash another device</button>
+        </div>
+      {/if}
+
     {/if}
 
     {/if}
