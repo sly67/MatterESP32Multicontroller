@@ -40,18 +40,19 @@ esphome:
           #include "driver/ledc.h"
           #include <cmath>
           struct Drv8833Mono : public Component, public FloatOutput {
-            int gpio_a_, gpio_b_;
+            int gpio_a_, gpio_b_, freq_hz_, res_bits_;
             ledc_channel_t ch_a_, ch_b_;
             ledc_timer_t timer_;
-            Drv8833Mono(int ga, int gb, int t, int ca, int cb)
+            Drv8833Mono(int ga, int gb, int t, int ca, int cb, int freq_hz = 15000, int res_bits = 12)
               : gpio_a_(ga), gpio_b_(gb), timer_((ledc_timer_t)t),
-                ch_a_((ledc_channel_t)ca), ch_b_((ledc_channel_t)cb) {}
+                ch_a_((ledc_channel_t)ca), ch_b_((ledc_channel_t)cb),
+                freq_hz_(freq_hz), res_bits_(res_bits) {}
             void setup() override {
               ledc_timer_config_t tc = {};
               tc.speed_mode = LEDC_LOW_SPEED_MODE;
-              tc.duty_resolution = LEDC_TIMER_12_BIT;
+              tc.duty_resolution = (ledc_timer_bit_t)res_bits_;
               tc.timer_num = timer_;
-              tc.freq_hz = 15000;
+              tc.freq_hz = freq_hz_;
               tc.clk_cfg = LEDC_AUTO_CLK;
               ledc_timer_config(&tc);
               ledc_channel_config_t cc = {};
@@ -65,12 +66,13 @@ esphome:
               ledc_channel_config(&cc);
               cc.gpio_num = gpio_b_;
               cc.channel = ch_b_;
-              cc.hpoint = 2048;
+              cc.hpoint = (1u << res_bits_) / 2;
               ledc_channel_config(&cc);
             }
             void write_state(float state) override {
               float g = powf(state, 2.2f);
-              uint32_t duty = (uint32_t)(g * 2048.0f);
+              uint32_t half = (1u << res_bits_) / 2;
+              uint32_t duty = (uint32_t)(g * (float)half);
               ledc_set_duty(LEDC_LOW_SPEED_MODE, ch_a_, duty);
               ledc_update_duty(LEDC_LOW_SPEED_MODE, ch_a_);
               ledc_set_duty(LEDC_LOW_SPEED_MODE, ch_b_, duty);
@@ -120,7 +122,7 @@ esphome:
                     case 0:
                       if (++s.step >= s.wait) {
                         s.state = 1; s.step = 0;
-                        s.peak = 0.2f + (rand() % 40) * 0.01f;
+                        s.peak = 0.2f + (rand() % 41) * 0.01f;
                         s.wait = 5 + rand() % 28;
                       }
                       break;
