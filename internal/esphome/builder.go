@@ -53,6 +53,21 @@ func (b *Builder) Compile(ctx context.Context, deviceName string, yaml string, l
 		return nil, fmt.Errorf("write config: %w", err)
 	}
 
+	// Write SDK header wrappers so modules can use esphome: includes: with SDK paths.
+	// Including SDK headers inside a lambda body is invalid C++ (extern "C" at function scope);
+	// ESPHome's includes: emits #include at file scope, which is correct.
+	for relPath, content := range map[string]string{
+		"driver/ledc.h": "#pragma once\n#include <driver/ledc.h>\n",
+	} {
+		wrapPath := filepath.Join(devDir, relPath)
+		if err := os.MkdirAll(filepath.Dir(wrapPath), 0755); err != nil {
+			return nil, fmt.Errorf("create wrapper dir: %w", err)
+		}
+		if err := os.WriteFile(wrapPath, []byte(content), 0644); err != nil {
+			return nil, fmt.Errorf("write header wrapper %s: %w", relPath, err)
+		}
+	}
+
 	deviceSlug := slug(deviceName)
 
 	cmd := exec.CommandContext(ctx,
