@@ -1,21 +1,25 @@
 id: drv8833-led
 name: "DRV8833 Warm White LED Strip (A Channel)"
-version: "1.3"
+version: "2.0"
 category: driver
 io:
   - id: AIN1
     type: digital_pwm_out
     label: "Bridge A Input 1 → AOUT1 (A+) — Side 1"
     constraints:
-      pwm: {frequency_hz: 25000, duty_min: 0.0, duty_max: 1.0, resolution_bits: 11}
+      pwm: {frequency_hz: 15000, duty_min: 0.0, duty_max: 1.0, resolution_bits: 12}
   - id: AIN2
     type: digital_pwm_out
     label: "Bridge A Input 2 → AOUT2 (A-) — Side 2"
     constraints:
-      pwm: {frequency_hz: 25000, duty_min: 0.0, duty_max: 1.0, resolution_bits: 11}
+      pwm: {frequency_hz: 15000, duty_min: 0.0, duty_max: 1.0, resolution_bits: 12}
+  - id: LEDC_CHAN_AIN1
+    type: config
+    label: "LEDC Channel for AIN1 (0–5)"
+  - id: LEDC_CHAN_AIN2
+    type: config
+    label: "LEDC Channel for AIN2 (0–5)"
 pin_groups:
-  # Anti-parallel LEDs on one H-bridge — cwww blends the two sides;
-  # DRV8833 handles simultaneous drive safely (brake = 0 V across strip).
   - {id: bridge_A, pins: [AIN1, AIN2], mode: complementary, dead_time_us: 1}
 matter:
   endpoint_type: color_temperature_light
@@ -27,13 +31,15 @@ esphome:
         platform: ledc
         pin: "{AIN1}"
         id: {ID}_ain1
-        frequency: 25000Hz
+        frequency: 15000Hz
+        channel: {LEDC_CHAN_AIN1}
     - domain: output
       template: |
         platform: ledc
         pin: "{AIN2}"
         id: {ID}_ain2
-        frequency: 25000Hz
+        frequency: 15000Hz
+        channel: {LEDC_CHAN_AIN2}
     - domain: light
       template: |
         platform: cwww
@@ -42,7 +48,7 @@ esphome:
         cold_white: {ID}_ain2
         warm_white_color_temperature: 2700K
         cold_white_color_temperature: 6500K
-        gamma_correct: 1
+        gamma_correct: 2.2
         effects:
           - strobe:
           - pulse:
