@@ -1,0 +1,11 @@
+id: drv8833-mono-strip-c3
+board: esp32-c3
+modules:
+  - module: drv8833-led-mono
+    endpoint_name: "Mono LED Strip"
+    pins:
+      AIN1: GPIO0
+      AIN2: GPIO1
+      LEDC_TIMER: "1"
+      LEDC_CHAN_A: "2"
+      LEDC_CHAN_B: "3"

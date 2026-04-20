@@ -11,13 +11,14 @@ import (
 func TestLoadModules_ReturnsAll(t *testing.T) {
 	mods, err := library.LoadModules()
 	require.NoError(t, err)
-	assert.Len(t, mods, 10)
+	assert.Len(t, mods, 11)
 	ids := make(map[string]bool)
 	for _, m := range mods {
 		ids[m.ID] = true
 	}
 	assert.True(t, ids["drv8833"])
 	assert.True(t, ids["drv8833-led"])
+	assert.True(t, ids["drv8833-led-mono"])
 	assert.True(t, ids["wrgb-led"])
 	assert.True(t, ids["bh1750"])
 	assert.True(t, ids["analog-in"])
