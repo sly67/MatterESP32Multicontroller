@@ -476,11 +476,31 @@ func prepareWebFlashESPHome(database *db.Database, dataDir string) http.HandlerF
 			ch <- binResult{bin, err}
 		}()
 
-		scanner := bufio.NewScanner(pr)
-		for scanner.Scan() {
-			line := strings.TrimSpace(scanner.Text())
-			if line != "" {
-				sendLine(map[string]string{"log": line})
+		// Keepalive: send a ping every 20s when the compiler produces no output,
+		// preventing browser/proxy timeouts during silent phases (e.g. dep download).
+		lineCh := make(chan string)
+		go func() {
+			scanner := bufio.NewScanner(pr)
+			for scanner.Scan() {
+				lineCh <- scanner.Text()
+			}
+			close(lineCh)
+		}()
+		ticker := time.NewTicker(20 * time.Second)
+		defer ticker.Stop()
+	scanLoop:
+		for {
+			select {
+			case line, ok := <-lineCh:
+				if !ok {
+					break scanLoop
+				}
+				if s := strings.TrimSpace(line); s != "" {
+					sendLine(map[string]string{"log": s})
+				}
+				ticker.Reset(20 * time.Second)
+			case <-ticker.C:
+				sendLine(map[string]string{"log": "…"})
 			}
 		}
 

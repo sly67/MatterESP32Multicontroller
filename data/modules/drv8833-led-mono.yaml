@@ -34,6 +34,8 @@ matter:
   endpoint_type: dimmable_light
   behaviors: [on_off, level_control]
 esphome:
+  includes:
+    - driver/ledc.h
   components:
     - domain: output
       template: |
@@ -42,9 +44,6 @@ esphome:
         type: float
         write_action:
           - lambda: |-
-              #include "driver/ledc.h"
-              #include <cmath>
-              #include <stdlib.h>
               static bool drv_inited = false;
               if (!drv_inited) {
                 drv_inited = true;

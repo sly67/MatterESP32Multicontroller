@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/karthangar/matteresp32hub/internal/db"
@@ -173,15 +174,35 @@ func runESPHomeFlash(database *db.Database) http.HandlerFunc {
 			done <- result
 		}()
 
-		scanner := bufio.NewScanner(pr)
-		for scanner.Scan() {
-			line := strings.TrimSpace(scanner.Text())
-			if line == "" {
-				continue
+		lineCh := make(chan string)
+		go func() {
+			scanner := bufio.NewScanner(pr)
+			for scanner.Scan() {
+				lineCh <- scanner.Text()
 			}
-			json.NewEncoder(w).Encode(map[string]string{"log": line}) //nolint:errcheck
-			if canFlush {
-				flusher.Flush()
+			close(lineCh)
+		}()
+		ticker := time.NewTicker(20 * time.Second)
+		defer ticker.Stop()
+	scanLoop:
+		for {
+			select {
+			case line, ok := <-lineCh:
+				if !ok {
+					break scanLoop
+				}
+				if s := strings.TrimSpace(line); s != "" {
+					json.NewEncoder(w).Encode(map[string]string{"log": s}) //nolint:errcheck
+					if canFlush {
+						flusher.Flush()
+					}
+				}
+				ticker.Reset(20 * time.Second)
+			case <-ticker.C:
+				json.NewEncoder(w).Encode(map[string]string{"log": "…"}) //nolint:errcheck
+				if canFlush {
+					flusher.Flush()
+				}
 			}
 		}
 

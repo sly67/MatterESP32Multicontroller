@@ -139,6 +139,7 @@ type ESPHomeComponent struct {
 
 // ESPHomeDef is the esphome: block in a module YAML.
 type ESPHomeDef struct {
+	Includes   []string           `yaml:"includes,omitempty"`
 	Components []ESPHomeComponent `yaml:"components"`
 }
 

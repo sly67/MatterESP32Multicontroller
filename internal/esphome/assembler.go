@@ -62,9 +62,32 @@ func Assemble(cfg Config, modules map[string]*yamldef.Module) (string, error) {
 	platform, boardName := bd[0], bd[1]
 	deviceSlug := slug(cfg.DeviceName)
 
+	// Collect ESPHome-level includes from active modules (deduplicated, ordered).
+	var espIncludes []string
+	seenInc := map[string]bool{}
+	for _, comp := range cfg.Components {
+		mod, ok := modules[comp.Type]
+		if !ok || mod.ESPHome == nil {
+			continue
+		}
+		for _, inc := range mod.ESPHome.Includes {
+			if !seenInc[inc] {
+				seenInc[inc] = true
+				espIncludes = append(espIncludes, inc)
+			}
+		}
+	}
+
 	var sb strings.Builder
 
-	fmt.Fprintf(&sb, "esphome:\n  name: %s\n\n", deviceSlug)
+	fmt.Fprintf(&sb, "esphome:\n  name: %s\n", deviceSlug)
+	if len(espIncludes) > 0 {
+		sb.WriteString("  includes:\n")
+		for _, inc := range espIncludes {
+			fmt.Fprintf(&sb, "    - %s\n", inc)
+		}
+	}
+	sb.WriteByte('\n')
 	fmt.Fprintf(&sb, "%s:\n  board: %s\n  framework:\n    type: esp-idf\n\n", platform, boardName)
 	fmt.Fprintf(&sb, "wifi:\n  ssid: %q\n  password: %q\n  ap:\n    ssid: %q\n    password: \"changeme\"\n\n",
 		cfg.WiFiSSID, cfg.WiFiPassword, deviceSlug+"-fallback")
