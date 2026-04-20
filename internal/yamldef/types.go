@@ -11,6 +11,7 @@ const (
 	IOTypeADCIn         = "adc_in"
 	IOTypeI2CData       = "i2c_data"
 	IOTypeI2CClock      = "i2c_clock"
+	IOTypeConfig        = "config" // non-GPIO configuration value (e.g. LEDC channel, timer index)
 )
 
 // ParamType values for EffectParam.Type.
@@ -46,18 +47,18 @@ type Module struct {
 
 // IOPin is a single input/output pin declaration within a module.
 type IOPin struct {
-	ID          string      `yaml:"id"`
-	Type        string      `yaml:"type"`
-	Label       string      `yaml:"label"`
-	Constraints Constraints `yaml:"constraints,omitempty"`
+	ID          string      `yaml:"id"          json:"id"`
+	Type        string      `yaml:"type"         json:"type"`
+	Label       string      `yaml:"label"        json:"label"`
+	Constraints Constraints `yaml:"constraints,omitempty" json:"constraints,omitempty"`
 }
 
 // Constraints holds type-specific pin constraints.
 type Constraints struct {
-	PWM     *PWMConstraints     `yaml:"pwm,omitempty"`
-	ADC     *ADCConstraints     `yaml:"adc,omitempty"`
-	I2C     *I2CConstraints     `yaml:"i2c,omitempty"`
-	Digital *DigitalConstraints `yaml:"digital,omitempty"`
+	PWM     *PWMConstraints     `yaml:"pwm,omitempty"     json:"pwm,omitempty"`
+	ADC     *ADCConstraints     `yaml:"adc,omitempty"     json:"adc,omitempty"`
+	I2C     *I2CConstraints     `yaml:"i2c,omitempty"     json:"i2c,omitempty"`
+	Digital *DigitalConstraints `yaml:"digital,omitempty" json:"digital,omitempty"`
 }
 
 // PWMConstraints describes PWM signal parameters.

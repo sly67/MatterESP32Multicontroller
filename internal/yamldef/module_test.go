@@ -138,3 +138,27 @@ matter:
 	require.NoError(t, err)
 	assert.Nil(t, mod.ESPHome)
 }
+
+func TestParseModule_ConfigTypePin(t *testing.T) {
+	yaml := []byte(`
+id: test-config
+name: "Test Config"
+version: "1.0"
+category: driver
+io:
+  - id: GPIO_A
+    type: digital_pwm_out
+    label: "Output GPIO"
+    constraints:
+      pwm: {frequency_hz: 15000, duty_min: 0.0, duty_max: 1.0, resolution_bits: 12}
+  - id: LEDC_CHAN
+    type: config
+    label: "LEDC Channel (0-5)"
+matter:
+  endpoint_type: dimmable_light
+  behaviors: [on_off, level_control]
+`)
+	mod, err := yamldef.ParseModule(yaml)
+	require.NoError(t, err)
+	assert.Equal(t, "config", mod.IO[1].Type)
+}
