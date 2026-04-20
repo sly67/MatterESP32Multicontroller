@@ -20,6 +20,8 @@ io:
     type: config
     label: "LEDC Channel for AIN2 (0–5)"
 pin_groups:
+  # Anti-parallel LEDs on one H-bridge — cwww blends the two sides;
+  # DRV8833 handles simultaneous drive safely (brake = 0 V across strip).
   - {id: bridge_A, pins: [AIN1, AIN2], mode: complementary, dead_time_us: 1}
 matter:
   endpoint_type: color_temperature_light
