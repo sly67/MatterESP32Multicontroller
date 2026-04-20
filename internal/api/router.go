@@ -22,6 +22,7 @@ func NewRouter(cfg *config.Config, database *db.Database) http.Handler {
 	r.Route("/api/modules", modulesRouter(database))
 	r.Route("/api/effects", effectsRouter(database))
 	r.Route("/api/firmware", firmwareRouter(database))
+	r.Route("/api/build", buildRouter(cfg))
 	r.Route("/api/flash", flashRouter(database))
 	r.Route("/api/webflash", webflashRouter(cfg, database))
 	r.Route("/api/settings", settingsRouter(cfg, database))

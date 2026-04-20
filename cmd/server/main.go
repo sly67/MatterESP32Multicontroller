@@ -7,6 +7,7 @@ import (
 	"github.com/karthangar/matteresp32hub/internal/api"
 	"github.com/karthangar/matteresp32hub/internal/config"
 	"github.com/karthangar/matteresp32hub/internal/db"
+	"github.com/karthangar/matteresp32hub/internal/fwwatch"
 	"github.com/karthangar/matteresp32hub/internal/seed"
 	"github.com/karthangar/matteresp32hub/internal/tlsutil"
 )
@@ -35,6 +36,8 @@ func main() {
 	if err := tlsutil.EnsureCerts(certsDir); err != nil {
 		log.Fatalf("tls: %v", err)
 	}
+
+	fwwatch.Start(database, dataDir)
 
 	// Start placeholder OTA server (full implementation in Plan 4)
 	go func() {

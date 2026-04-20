@@ -18,13 +18,12 @@ type ComponentConfig struct {
 type Config struct {
 	Board         string            // e.g. "esp32-c3"
 	DeviceName    string            // e.g. "Kitchen Sensor" → slug: "kitchen-sensor"
-	DeviceID      string            // chip MAC, used in heartbeat URL
+	DeviceID      string            // device ID stored in DB
 	WiFiSSID      string
 	WiFiPassword  string
 	HAIntegration bool
 	APIKey        string // base64-encoded 32-byte key; required if HAIntegration == true
 	OTAPassword   string // hex random bytes
-	HubURL        string // e.g. "http://192.168.1.10:8080"
 	Components    []ComponentConfig
 }
 
@@ -74,11 +73,9 @@ func Assemble(cfg Config, modules map[string]*yamldef.Module) (string, error) {
 
 	if cfg.HAIntegration && cfg.APIKey != "" {
 		fmt.Fprintf(&sb, "api:\n  encryption:\n    key: %q\n\n", cfg.APIKey)
+	} else {
+		sb.WriteString("api:\n\n")
 	}
-
-	fmt.Fprintf(&sb, "http_request:\n  useragent: MatterHub-ESPHome/1.0\n\n")
-	fmt.Fprintf(&sb, "interval:\n  - interval: 60s\n    then:\n      - http_request.post:\n          url: %q\n\n",
-		cfg.HubURL+"/api/devices/"+cfg.DeviceID+"/heartbeat")
 
 	// Collect rendered component entries grouped by domain
 	type entry struct{ domain, rendered string }

@@ -386,15 +386,14 @@ func prepareWebFlashESPHome(database *db.Database, dataDir string) http.HandlerF
 			DeviceName    string                    `json:"device_name"`
 			WiFiSSID      string                    `json:"wifi_ssid"`
 			WiFiPassword  string                    `json:"wifi_password"`
-			HubURL        string                    `json:"hub_url"`
 			HAIntegration bool                      `json:"ha_integration"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "invalid JSON", http.StatusBadRequest)
 			return
 		}
-		if req.DeviceName == "" || req.Board == "" || req.HubURL == "" {
-			http.Error(w, "device_name, board, hub_url are required", http.StatusBadRequest)
+		if req.DeviceName == "" || req.Board == "" {
+			http.Error(w, "device_name and board are required", http.StatusBadRequest)
 			return
 		}
 
@@ -448,7 +447,6 @@ func prepareWebFlashESPHome(database *db.Database, dataDir string) http.HandlerF
 			DeviceID:      deviceID,
 			WiFiSSID:      req.WiFiSSID,
 			WiFiPassword:  req.WiFiPassword,
-			HubURL:        req.HubURL,
 			HAIntegration: req.HAIntegration,
 			APIKey:        apiKey,
 			OTAPassword:   otaPassword,
@@ -496,9 +494,8 @@ func prepareWebFlashESPHome(database *db.Database, dataDir string) http.HandlerF
 			Board         string                    `json:"board"`
 			HAIntegration bool                      `json:"ha_integration"`
 			OTAPassword   string                    `json:"ota_password"`
-			HubURL        string                    `json:"hub_url"`
 			Components    []esphome.ComponentConfig `json:"components"`
-		}{req.Board, req.HAIntegration, otaPassword, req.HubURL, req.Components})
+		}{req.Board, req.HAIntegration, otaPassword, req.Components})
 
 		if err := database.CreateDevice(db.Device{
 			ID:            deviceID,

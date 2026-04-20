@@ -1,0 +1,21 @@
+idf_component_register(
+    SRCS
+        "app_main.cpp"
+        "nvs_config.cpp"
+        "drv8833.cpp"
+        "matter_app.cpp"
+        "console_cmd.cpp"
+    INCLUDE_DIRS "."
+    REQUIRES
+        nvs_flash
+        esp_wifi
+        esp_event
+        esp_netif
+        driver
+        esp_timer
+        spi_flash
+        app_update
+        esp_matter
+    PRIV_REQUIRES
+        console
+)

@@ -28,8 +28,8 @@ func GenerateBinary(csvContent string) (string, error) {
 
 	binPath := filepath.Join(dir, "nvs.bin")
 	out, err := exec.Command(
-		"nvs_partition_gen.py", "generate",
-		csvPath, binPath, NVSPartitionSize,
+		"python3", "-m", "esp_idf_nvs_partition_gen.nvs_partition_gen",
+		"generate", csvPath, binPath, NVSPartitionSize,
 	).CombinedOutput()
 	if err != nil {
 		os.RemoveAll(dir)

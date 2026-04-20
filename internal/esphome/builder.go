@@ -37,7 +37,7 @@ func NewBuilder(cacheDir, volumeRef string) (*Builder, error) {
 func (b *Builder) Close() {}
 
 // Compile writes the ESPHome YAML to disk, compiles it in a Docker container, and
-// returns the firmware-factory.bin bytes. Build logs are streamed to logWriter.
+// returns the firmware.factory.bin bytes. Build logs are streamed to logWriter.
 // deviceName is used as both the config directory name and the YAML device slug.
 func (b *Builder) Compile(ctx context.Context, deviceName string, yaml string, logWriter io.Writer) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, compileTimeout)
@@ -57,6 +57,7 @@ func (b *Builder) Compile(ctx context.Context, deviceName string, yaml string, l
 
 	cmd := exec.CommandContext(ctx,
 		"docker", "run", "--rm",
+		"--network", "host",
 		"-v", b.volumeRef+":/config",
 		"ghcr.io/esphome/esphome:latest",
 		"compile",
@@ -69,7 +70,7 @@ func (b *Builder) Compile(ctx context.Context, deviceName string, yaml string, l
 		return nil, fmt.Errorf("esphome compile: %w", err)
 	}
 
-	binPath := filepath.Join(devDir, ".esphome", "build", deviceSlug, ".pioenvs", deviceSlug, "firmware-factory.bin")
+	binPath := filepath.Join(devDir, ".esphome", "build", deviceSlug, ".pioenvs", deviceSlug, "firmware.factory.bin")
 	bin, err := os.ReadFile(binPath)
 	if err != nil {
 		return nil, fmt.Errorf("read firmware binary (%s): %w", binPath, err)

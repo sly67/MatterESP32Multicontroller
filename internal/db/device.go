@@ -100,6 +100,12 @@ func (d *Database) UpdateDeviceFWVersion(id, fwVersion, ip string) error {
 	return err
 }
 
+// DeleteDevice removes a device by ID.
+func (d *Database) DeleteDevice(id string) error {
+	_, err := d.DB.Exec(`DELETE FROM devices WHERE id = ?`, id)
+	return err
+}
+
 // UpdateDeviceMatterCreds stores the Matter commissioning discriminator and passcode.
 func (d *Database) UpdateDeviceMatterCreds(id string, discrim uint16, passcode uint32) error {
 	_, err := d.DB.Exec(

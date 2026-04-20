@@ -9,5 +9,6 @@ set(EXTRA_COMPONENT_DIRS
     $ENV{ESP_MATTER_PATH}/connectedhomeip/connectedhomeip/config/esp32/components
 )
 
+set(PROJECT_VER "1.1.6")
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(matter_hub_firmware)

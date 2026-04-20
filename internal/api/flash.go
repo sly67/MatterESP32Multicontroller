@@ -118,7 +118,6 @@ func runESPHomeFlash(database *db.Database) http.HandlerFunc {
 			DeviceName    string                   `json:"device_name"`
 			WiFiSSID      string                   `json:"wifi_ssid"`
 			WiFiPassword  string                   `json:"wifi_password"`
-			HubURL        string                   `json:"hub_url"`
 			Board         string                   `json:"board"`
 			HAIntegration bool                     `json:"ha_integration"`
 			Components    []esphome.ComponentConfig `json:"components"`
@@ -127,8 +126,8 @@ func runESPHomeFlash(database *db.Database) http.HandlerFunc {
 			http.Error(w, "invalid JSON", http.StatusBadRequest)
 			return
 		}
-		if req.Port == "" || req.DeviceName == "" || req.Board == "" || req.HubURL == "" {
-			http.Error(w, "port, device_name, board, hub_url are required", http.StatusBadRequest)
+		if req.Port == "" || req.DeviceName == "" || req.Board == "" {
+			http.Error(w, "port, device_name, and board are required", http.StatusBadRequest)
 			return
 		}
 
@@ -166,7 +165,6 @@ func runESPHomeFlash(database *db.Database) http.HandlerFunc {
 				DeviceName:    req.DeviceName,
 				WiFiSSID:      req.WiFiSSID,
 				WiFiPassword:  req.WiFiPassword,
-				HubURL:        req.HubURL,
 				Board:         req.Board,
 				HAIntegration: req.HAIntegration,
 				Components:    req.Components,

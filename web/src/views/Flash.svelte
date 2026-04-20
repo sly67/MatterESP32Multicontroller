@@ -98,6 +98,7 @@
   let bfEspFlashState = 'idle'; // idle | connecting | writing | done | error
   let bfEspFlashMsg = '';
   let bfEspModules = [];
+  let bfEspInstallEl = null;
 
   async function loadBfEspModules() {
     try {
@@ -112,7 +113,7 @@
     if (!mod) return;
     const pins = {};
     (mod.io || []).forEach(p => { pins[p.id] = ''; });
-    bfEspComponents = [...bfEspComponents, { type: moduleId, name: mod.name, pins }];
+    bfEspComponents = [...bfEspComponents, { type: moduleId, name: mod.name, pins, io: mod.io || [] }];
   }
 
   function bfEspRemoveComponent(i) {
@@ -134,7 +135,6 @@
           device_name:    bfEspDeviceName,
           wifi_ssid:      bfEspWifiSSID,
           wifi_password:  bfEspWifiPassword,
-          hub_url:        bfEspHubURL,
           ha_integration: bfEspHA,
         }),
       });
@@ -171,6 +171,11 @@
     else if (state === 'error') { bfEspFlashState = 'error'; bfEspFlashMsg = e.detail?.message || 'Flash failed'; }
     else if (state === 'initializing' || state === 'preparing') { bfEspFlashState = 'connecting'; bfEspFlashMsg = 'Connecting…'; }
     else if (state === 'writing') { bfEspFlashState = 'writing'; bfEspFlashMsg = e.detail?.details || 'Writing…'; }
+  }
+
+  $: if (bfEspInstallEl) {
+    bfEspInstallEl.removeEventListener('state-changed', handleBfEspInstallEvent);
+    bfEspInstallEl.addEventListener('state-changed', handleBfEspInstallEvent);
   }
 
   function bfEspReset() {
@@ -270,6 +275,7 @@
   let espLogs = [];
   let espResult = null;        // {ok, device_id, name, error} | null
   let espModules = [];         // loaded from /api/modules?esphome=true
+  let espInstallEl = null;
 
   async function loadESPHomeModules() {
     try {
@@ -284,7 +290,7 @@
     if (!mod) return;
     const pins = {};
     (mod.io || []).forEach(p => { pins[p.id] = ''; });
-    espComponents = [...espComponents, { type: moduleId, name: mod.name, pins }];
+    espComponents = [...espComponents, { type: moduleId, name: mod.name, pins, io: mod.io || [] }];
   }
 
   function espRemoveComponent(i) {
@@ -343,6 +349,27 @@
     espHA = false; espFlashing = false; espFlashError = '';
     espLogs = []; espResult = null; firmwareType = 'matter';
   }
+
+  // ── GPIO lists per board ──────────────────────────────────────────────────
+  const BOARD_GPIOS = {
+    'esp32-c3':  ['GPIO0','GPIO1','GPIO2','GPIO3','GPIO4','GPIO5','GPIO6','GPIO7',
+                  'GPIO8','GPIO9','GPIO10','GPIO18','GPIO19','GPIO20','GPIO21'],
+    'esp32-h2':  ['GPIO0','GPIO1','GPIO2','GPIO3','GPIO4','GPIO5','GPIO6','GPIO7',
+                  'GPIO8','GPIO9','GPIO10','GPIO11','GPIO12','GPIO13','GPIO14','GPIO15',
+                  'GPIO16','GPIO17','GPIO18','GPIO19','GPIO20','GPIO21','GPIO22','GPIO23',
+                  'GPIO25','GPIO26','GPIO27'],
+    'esp32':     ['GPIO0','GPIO1','GPIO2','GPIO3','GPIO4','GPIO5',
+                  'GPIO12','GPIO13','GPIO14','GPIO15','GPIO16','GPIO17',
+                  'GPIO18','GPIO19','GPIO21','GPIO22','GPIO23',
+                  'GPIO25','GPIO26','GPIO27',
+                  'GPIO32','GPIO33','GPIO34','GPIO35','GPIO36','GPIO39'],
+    'esp32-s3':  ['GPIO1','GPIO2','GPIO3','GPIO4','GPIO5','GPIO6','GPIO7',
+                  'GPIO8','GPIO9','GPIO10','GPIO11','GPIO12','GPIO13','GPIO14',
+                  'GPIO15','GPIO16','GPIO17','GPIO18','GPIO19','GPIO20','GPIO21',
+                  'GPIO35','GPIO36','GPIO37','GPIO38','GPIO39','GPIO40',
+                  'GPIO41','GPIO42','GPIO43','GPIO44','GPIO45','GPIO46','GPIO47','GPIO48'],
+  };
+  function boardGpios(board) { return BOARD_GPIOS[board] ?? BOARD_GPIOS['esp32-c3']; }
 
   // ── Serial Debug ───────────────────────────────────────────────────────────
   const BAUD_RATES = [74880, 115200, 921600];
@@ -676,10 +703,20 @@
               <input class="input input-bordered input-sm w-full" placeholder="Name (e.g. Room Temp)"
                 bind:value={comp.name} />
               {#each Object.keys(comp.pins) as role}
+                {@const pinDef = (comp.io || []).find(p => p.id === role)}
                 <label class="text-xs flex items-center gap-2">
-                  <span class="w-12 font-mono">{role}</span>
-                  <input class="input input-bordered input-xs flex-1" placeholder="GPIO4"
-                    bind:value={comp.pins[role]} />
+                  <span class="w-24 font-mono">{role}</span>
+                  {#if pinDef?.type === 'config'}
+                    <input class="input input-bordered input-xs flex-1" type="text"
+                      placeholder="integer" bind:value={comp.pins[role]} />
+                  {:else}
+                    <select class="select select-bordered select-xs flex-1" bind:value={comp.pins[role]}>
+                      <option value="">Select GPIO…</option>
+                      {#each boardGpios(bfEspBoard) as gpio}
+                        <option value={gpio}>{gpio}</option>
+                      {/each}
+                    </select>
+                  {/if}
                 </label>
               {/each}
             </div>
@@ -703,7 +740,6 @@
           <input class="input input-bordered input-sm" placeholder="Device name" bind:value={bfEspDeviceName} />
           <input class="input input-bordered input-sm" placeholder="WiFi SSID" bind:value={bfEspWifiSSID} />
           <input class="input input-bordered input-sm" type="password" placeholder="WiFi password" bind:value={bfEspWifiPassword} />
-          <input class="input input-bordered input-sm" placeholder="Hub URL (e.g. http://192.168.1.10:48060)" bind:value={bfEspHubURL} />
           <label class="flex items-center gap-2 text-sm cursor-pointer">
             <input type="checkbox" class="checkbox checkbox-sm" bind:checked={bfEspHA} />
             Home Assistant integration (generates API encryption key)
@@ -720,18 +756,25 @@
       {:else if bfEspStep === 4}
         <div class="flex flex-col gap-3">
           <div class="text-sm font-semibold">
-            {bfEspCompiling ? 'Compiling… (may take several minutes on first flash)' : 'Compilation done — plug in your device and flash'}
+            {bfEspCompiling ? 'Compiling… (may take several minutes on first flash)' : bfEspError ? 'Compilation failed' : 'Compilation done — plug in your device and flash'}
           </div>
           <div class="bg-base-300 rounded p-2 h-48 overflow-y-auto font-mono text-xs">
             {#each bfEspLogs as line}<div>{line}</div>{/each}
             {#if bfEspCompiling}<div class="animate-pulse">▋</div>{/if}
           </div>
-          {#if bfEspError}<div class="alert alert-error text-xs">{bfEspError}</div>{/if}
+          {#if bfEspError}
+            <div class="alert alert-error text-xs">{bfEspError}</div>
+            <div class="flex gap-2">
+              <button class="btn btn-ghost btn-sm" on:click={() => bfEspStep = 3}>← Back</button>
+              <button class="btn btn-warning btn-sm" on:click={bfEspDoCompile}>↺ Retry</button>
+            </div>
+          {/if}
         </div>
 
       {:else if bfEspStep === 5}
         <div class="flex flex-col gap-3">
           <div class="alert alert-success text-sm">Firmware compiled — plug your ESP32 into <strong>this computer</strong> via USB, then click Connect &amp; Flash.</div>
+          <p class="text-xs text-base-content/50">The device is already registered in the hub database. This step writes the firmware to flash memory.</p>
           {#if bfEspFlashState === 'error'}
             <div class="alert alert-error text-sm">{bfEspFlashMsg || 'Flash failed'}</div>
           {/if}
@@ -741,14 +784,19 @@
               {bfEspFlashMsg}
             </div>
           {/if}
-          <div class="flex gap-2 justify-end">
+          <div class="flex gap-2 justify-end items-center">
+            {#if bfEspFlashState !== 'idle' && bfEspFlashState !== 'error'}
+              <button class="btn btn-success btn-sm" on:click={() => { bfEspFlashState = 'done'; bfEspStep = 6; }}>
+                ✓ Flash complete — Continue
+              </button>
+            {/if}
             <esp-web-install-button
+              bind:this={bfEspInstallEl}
               manifest="/api/webflash/esphome-manifest?token={bfEspToken}"
-              on:state-changed={handleBfEspInstallEvent}
             >
               <button slot="activate" class="btn btn-warning btn-sm"
                 disabled={bfEspFlashState !== 'idle'}>
-                {#if bfEspFlashState !== 'idle'}
+                {#if bfEspFlashState !== 'idle' && bfEspFlashState !== 'error'}
                   <span class="loading loading-spinner loading-xs"></span> Flashing…
                 {:else}
                   ⚡ Connect &amp; Flash
@@ -1014,10 +1062,20 @@
               <input class="input input-bordered input-sm w-full" placeholder="Name (e.g. Room Temp)"
                 bind:value={comp.name} />
               {#each Object.keys(comp.pins) as role}
+                {@const pinDef = (comp.io || []).find(p => p.id === role)}
                 <label class="text-xs flex items-center gap-2">
-                  <span class="w-12 font-mono">{role}</span>
-                  <input class="input input-bordered input-xs flex-1" placeholder="GPIO4"
-                    bind:value={comp.pins[role]} />
+                  <span class="w-24 font-mono">{role}</span>
+                  {#if pinDef?.type === 'config'}
+                    <input class="input input-bordered input-xs flex-1" type="text"
+                      placeholder="integer" bind:value={comp.pins[role]} />
+                  {:else}
+                    <select class="select select-bordered select-xs flex-1" bind:value={comp.pins[role]}>
+                      <option value="">Select GPIO…</option>
+                      {#each boardGpios(espBoard) as gpio}
+                        <option value={gpio}>{gpio}</option>
+                      {/each}
+                    </select>
+                  {/if}
                 </label>
               {/each}
             </div>
@@ -1042,7 +1100,6 @@
           <input class="input input-bordered input-sm" placeholder="Device name" bind:value={espDeviceName} />
           <input class="input input-bordered input-sm" placeholder="WiFi SSID" bind:value={espWifiSSID} />
           <input class="input input-bordered input-sm" type="password" placeholder="WiFi password" bind:value={espWifiPassword} />
-          <input class="input input-bordered input-sm" placeholder="Hub URL (e.g. http://192.168.1.10:48060)" bind:value={espHubURL} />
           <label class="flex items-center gap-2 text-sm cursor-pointer">
             <input type="checkbox" class="checkbox checkbox-sm" bind:checked={espHA} />
             Home Assistant integration (generates API encryption key)
@@ -1063,13 +1120,19 @@
         <!-- Step 4: Compile + flash progress -->
         <div class="flex flex-col gap-3">
           <div class="text-sm font-semibold">
-            {espFlashing ? 'Compiling + flashing… (may take several minutes on first flash)' : 'Done'}
+            {espFlashing ? 'Compiling + flashing… (may take several minutes on first flash)' : espFlashError ? 'Compilation failed' : 'Done'}
           </div>
           <div class="bg-base-300 rounded p-2 h-48 overflow-y-auto font-mono text-xs">
             {#each espLogs as line}<div>{line}</div>{/each}
             {#if espFlashing}<div class="animate-pulse">▋</div>{/if}
           </div>
-          {#if espFlashError}<div class="alert alert-error text-xs">{espFlashError}</div>{/if}
+          {#if espFlashError}
+            <div class="alert alert-error text-xs">{espFlashError}</div>
+            <div class="flex gap-2">
+              <button class="btn btn-ghost btn-sm" on:click={() => espStep = 3}>← Back</button>
+              <button class="btn btn-warning btn-sm" on:click={espDoFlash}>↺ Retry</button>
+            </div>
+          {/if}
         </div>
 
       {:else if espStep === 5 || espStep === 6}

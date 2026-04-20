@@ -24,7 +24,6 @@ type ESPHomeRequest struct {
 	DeviceName   string
 	WiFiSSID     string
 	WiFiPassword string
-	HubURL       string
 	Board        string
 	HAIntegration bool
 	Components   []esphome.ComponentConfig
@@ -69,7 +68,6 @@ func FlashESPHomeDevice(database *db.Database, builder *esphome.Builder,
 		HAIntegration: req.HAIntegration,
 		APIKey:        apiKey,
 		OTAPassword:   otaPassword,
-		HubURL:        req.HubURL,
 		Components:    req.Components,
 	}
 	yamlStr, err := esphome.Assemble(cfg, modules)
@@ -103,13 +101,11 @@ func FlashESPHomeDevice(database *db.Database, builder *esphome.Builder,
 		Board         string                    `json:"board"`
 		HAIntegration bool                      `json:"ha_integration"`
 		OTAPassword   string                    `json:"ota_password"`
-		HubURL        string                    `json:"hub_url"`
 		Components    []esphome.ComponentConfig `json:"components"`
 	}{
 		Board:         req.Board,
 		HAIntegration: req.HAIntegration,
 		OTAPassword:   otaPassword,
-		HubURL:        req.HubURL,
 		Components:    req.Components,
 	}
 	cfgJSON, err := json.Marshal(esphomeCfg)

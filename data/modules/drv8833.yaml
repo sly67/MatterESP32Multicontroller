@@ -1,59 +1,41 @@
 id: drv8833
 name: "DRV8833 Dual H-Bridge Motor Driver"
-version: "1.0"
+version: "1.1"
 category: driver
 io:
   - id: AIN1
     type: digital_pwm_out
-    label: "Bridge A Input 1"
+    label: "Bridge A Input 1 (warm / forward)"
     constraints:
-      pwm: {frequency_hz: 20000, duty_min: 0.0, duty_max: 1.0, resolution_bits: 10}
+      pwm: {frequency_hz: 20000, duty_min: 0.0, duty_max: 1.0, resolution_bits: 11}
   - id: AIN2
     type: digital_pwm_out
-    label: "Bridge A Input 2"
+    label: "Bridge A Input 2 (cool / reverse)"
     constraints:
-      pwm: {frequency_hz: 20000, duty_min: 0.0, duty_max: 1.0, resolution_bits: 10}
+      pwm: {frequency_hz: 20000, duty_min: 0.0, duty_max: 1.0, resolution_bits: 11}
   - id: BIN1
     type: digital_pwm_out
-    label: "Bridge B Input 1"
+    label: "Bridge B Input 1 (warm / forward)"
     constraints:
-      pwm: {frequency_hz: 20000, duty_min: 0.0, duty_max: 1.0, resolution_bits: 10}
+      pwm: {frequency_hz: 20000, duty_min: 0.0, duty_max: 1.0, resolution_bits: 11}
   - id: BIN2
     type: digital_pwm_out
-    label: "Bridge B Input 2"
+    label: "Bridge B Input 2 (cool / reverse)"
     constraints:
-      pwm: {frequency_hz: 20000, duty_min: 0.0, duty_max: 1.0, resolution_bits: 10}
+      pwm: {frequency_hz: 20000, duty_min: 0.0, duty_max: 1.0, resolution_bits: 11}
 channels:
   - {id: A, in: [AIN1, AIN2], label: "H-Bridge A (AOUT1/AOUT2)"}
   - {id: B, in: [BIN1, BIN2], label: "H-Bridge B (BOUT1/BOUT2)"}
 pin_groups:
-  - {id: bridge_A, pins: [AIN1, AIN2], mode: complementary, dead_time_us: 10}
-  - {id: bridge_B, pins: [BIN1, BIN2], mode: complementary, dead_time_us: 10}
+  # Phase-sequential (not true complementary) — AIN1 and AIN2 never overlap.
+  # DRV8833 has integrated shoot-through protection; no external dead time needed.
+  - {id: bridge_A, pins: [AIN1, AIN2], mode: complementary}
+  - {id: bridge_B, pins: [BIN1, BIN2], mode: complementary}
 truth_table:
-  coast:   {in1: 0,   in2: 0}
-  reverse: {in1: 0,   in2: 1}
-  forward: {in1: 1,   in2: 0}
-  brake:   {in1: 1,   in2: 1}
-pwm_modes:
-  forward_fast: {in1: PWM, in2: 0}
-  forward_slow: {in1: 1,   in2: PWM}
-  reverse_fast: {in1: 0,   in2: PWM}
-  reverse_slow: {in1: PWM, in2: 1}
-capabilities:
-  - id: channel_mode
-    type: select
-    label: "Active channels"
-    options:
-      - {value: A_only,      label: "Channel A only (LED set 1)"}
-      - {value: B_only,      label: "Channel B only (LED set 2)"}
-      - {value: both,        label: "Both simultaneously"}
-      - {value: alternating, label: "Alternating (firefly)"}
-  - id: decay_mode
-    type: select
-    label: "PWM decay mode"
-    options:
-      - {value: fast, label: "Fast decay (coast between pulses)"}
-      - {value: slow, label: "Slow decay (brake between pulses)"}
+  coast:   {in1: 0, in2: 0}
+  reverse: {in1: 0, in2: 1}
+  forward: {in1: 1, in2: 0}
+  brake:   {in1: 1, in2: 1}
 matter:
-  endpoint_type: extended_color_light
-  behaviors: [firefly_effect, brightness]
+  endpoint_type: color_temperature_light
+  behaviors: [on_off, level_control, color_temperature]

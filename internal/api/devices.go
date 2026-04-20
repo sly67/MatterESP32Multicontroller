@@ -19,7 +19,13 @@ func devicesRouter(database *db.Database) func(chi.Router) {
 		r.Get("/{id}/esphome-key", getESPHomeKey(database))
 		r.Post("/{id}/heartbeat", heartbeat(database))
 		r.Get("/{id}", getDevice(database))
+		r.Delete("/{id}", deleteDevice(database))
 	}
+}
+
+type deviceListItem struct {
+	db.Device
+	ESPHomeBoard string `json:"esphome_board,omitempty"`
 }
 
 func listDevices(database *db.Database) http.HandlerFunc {
@@ -29,11 +35,21 @@ func listDevices(database *db.Database) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		if devs == nil {
-			devs = []db.Device{}
+		items := make([]deviceListItem, 0, len(devs))
+		for _, d := range devs {
+			item := deviceListItem{Device: d}
+			if d.FirmwareType == "esphome" && d.ESPHomeConfig != "" {
+				var cfg struct {
+					Board string `json:"board"`
+				}
+				if json.Unmarshal([]byte(d.ESPHomeConfig), &cfg) == nil {
+					item.ESPHomeBoard = cfg.Board
+				}
+			}
+			items = append(items, item)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(devs)
+		json.NewEncoder(w).Encode(items)
 	}
 }
 
@@ -96,6 +112,17 @@ func heartbeat(database *db.Database) http.HandlerFunc {
 			ip = ip[:i]
 		}
 		if err := database.UpdateDeviceStatus(id, "online", ip); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func deleteDevice(database *db.Database) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		if err := database.DeleteDevice(id); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}

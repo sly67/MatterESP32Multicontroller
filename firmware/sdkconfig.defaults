@@ -40,6 +40,13 @@ CONFIG_CHIP_ENABLE_WIFI_TELEMETRY=n
 # OTA — enable for future hub-triggered OTA
 CONFIG_ENABLE_OTA_REQUESTOR=y
 
-# Log level (set to WARN in production)
-CONFIG_LOG_DEFAULT_LEVEL_WARN=y
+# Main task stack — Matter + WiFi init overflows the 3584-byte default
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=16384
+
+# Console UART (matches the USB-serial port)
+CONFIG_ESP_CONSOLE_UART_NUM=0
+CONFIG_ESP_CONSOLE_UART_BAUDRATE=115200
+
+# Log level
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y
 CONFIG_LOG_MAXIMUM_LEVEL_DEBUG=y

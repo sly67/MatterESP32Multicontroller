@@ -11,6 +11,18 @@
   let pairModal = null; // { discriminator, passcode, qr_payload } | null
   let qrDataUrl = '';
   let pairError = '';
+  let deleteConfirm = null; // device to delete
+  let deleteError = '';
+
+  async function removeDevice(d) {
+    try {
+      await api.delete(`/api/devices/${d.id}`);
+      devices = devices.filter(x => x.id !== d.id);
+      deleteConfirm = null;
+    } catch (e) {
+      deleteError = e.message;
+    }
+  }
 
   onMount(async () => {
     try {
@@ -94,10 +106,11 @@
           <tr>
             <th>Name</th>
             <th>Status</th>
-            <th>Template</th>
+            <th>Type / Template</th>
             <th>Firmware</th>
             <th>IP</th>
             <th>Last Seen</th>
+            <th>Flashed</th>
             <th></th>
           </tr>
         </thead>
@@ -106,16 +119,30 @@
             <tr class="hover">
               <td class="font-mono text-sm">{d.name}</td>
               <td><span class="badge badge-sm {statusClass(d.status)}">{d.status}</span></td>
-              <td class="text-sm text-base-content/70">{d.template_id}</td>
-              <td class="text-sm font-mono">{d.fw_version || '—'}</td>
+              <td class="text-sm text-base-content/70">
+                {#if d.firmware_type === 'esphome'}
+                  <span class="badge badge-xs badge-info mr-1">ESPHome</span>{d.esphome_board || ''}
+                {:else}
+                  {d.template_id || '—'}
+                {/if}
+              </td>
+              <td class="text-sm font-mono">
+                {#if d.firmware_type === 'esphome'}
+                  <span class="text-base-content/40">ESPHome</span>
+                {:else}
+                  {d.fw_version || '—'}
+                {/if}
+              </td>
               <td class="text-sm font-mono">{d.ip || '—'}</td>
               <td class="text-sm text-base-content/50">{d.last_seen ? new Date(d.last_seen).toLocaleString() : '—'}</td>
-              <td>
+              <td class="text-sm text-base-content/50">{d.created_at ? new Date(d.created_at).toLocaleDateString() : '—'}</td>
+              <td class="flex gap-1">
                 {#if d.firmware_type === 'esphome'}
-                  <button class="btn btn-xs btn-outline" on:click={() => openESPHomeKey(d)}>ESPHome Key</button>
+                  <button class="btn btn-xs btn-outline" on:click={() => openESPHomeKey(d)}>Key</button>
                 {:else}
                   <button class="btn btn-xs btn-outline" on:click={() => openPairModal(d)}>Pair</button>
                 {/if}
+                <button class="btn btn-xs btn-error btn-outline" on:click={() => { deleteConfirm = d; deleteError = ''; }}>✕</button>
               </td>
             </tr>
           {/each}
@@ -187,6 +214,29 @@
       </div>
       <div class="px-5 pb-4 flex justify-end">
         <button class="btn btn-ghost btn-sm" on:click={closeESPHomeKey}>Close</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+{#if deleteConfirm}
+  <button class="fixed inset-0 z-40 bg-black/60 cursor-default" on:click={() => { deleteConfirm = null; deleteError = ''; }} />
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="bg-base-200 rounded-xl shadow-xl w-full max-w-sm flex flex-col">
+      <div class="flex items-center justify-between px-5 py-3 border-b border-base-300">
+        <span class="font-semibold text-sm">Remove device</span>
+        <button class="btn btn-ghost btn-xs" on:click={() => { deleteConfirm = null; deleteError = ''; }}>✕</button>
+      </div>
+      <div class="flex flex-col gap-3 p-5">
+        <p class="text-sm">Remove <span class="font-mono font-semibold">{deleteConfirm.name}</span> from the fleet?</p>
+        <p class="text-xs text-base-content/50">This only removes the device record — the physical device is unaffected.</p>
+        {#if deleteError}
+          <div class="alert alert-error text-xs">{deleteError}</div>
+        {/if}
+      </div>
+      <div class="px-5 pb-4 flex justify-end gap-2">
+        <button class="btn btn-ghost btn-sm" on:click={() => { deleteConfirm = null; deleteError = ''; }}>Cancel</button>
+        <button class="btn btn-error btn-sm" on:click={() => removeDevice(deleteConfirm)}>Delete</button>
       </div>
     </div>
   </div>
