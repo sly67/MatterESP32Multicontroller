@@ -16,9 +16,11 @@ io:
   - id: LEDC_CHAN_AIN1
     type: config
     label: "LEDC Channel for AIN1 (0–5)"
+    default: "0"
   - id: LEDC_CHAN_AIN2
     type: config
     label: "LEDC Channel for AIN2 (0–5)"
+    default: "1"
 pin_groups:
   # Anti-parallel LEDs on one H-bridge — cwww blends the two sides;
   # DRV8833 handles simultaneous drive safely (brake = 0 V across strip).

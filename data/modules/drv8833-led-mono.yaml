@@ -16,12 +16,15 @@ io:
   - id: LEDC_TIMER
     type: config
     label: "LEDC Timer index (0–3)"
+    default: "1"
   - id: LEDC_CHAN_A
     type: config
     label: "LEDC Channel for AIN1 (0–5)"
+    default: "2"
   - id: LEDC_CHAN_B
     type: config
     label: "LEDC Channel for AIN2 (0–5)"
+    default: "3"
 pin_groups:
   # Anti-parallel mono-color LEDs — bipolar drive alternates current direction
   # at high frequency so both physical halves light simultaneously.

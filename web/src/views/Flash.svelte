@@ -112,7 +112,7 @@
     const mod = bfEspModules.find(m => m.id === moduleId);
     if (!mod) return;
     const pins = {};
-    (mod.io || []).forEach(p => { pins[p.id] = ''; });
+    (mod.io || []).forEach(p => { pins[p.id] = p.default ?? ''; });
     bfEspComponents = [...bfEspComponents, { type: moduleId, name: mod.name, pins, io: mod.io || [] }];
   }
 
@@ -289,7 +289,7 @@
     const mod = espModules.find(m => m.id === moduleId);
     if (!mod) return;
     const pins = {};
-    (mod.io || []).forEach(p => { pins[p.id] = ''; });
+    (mod.io || []).forEach(p => { pins[p.id] = p.default ?? ''; });
     espComponents = [...espComponents, { type: moduleId, name: mod.name, pins, io: mod.io || [] }];
   }
 

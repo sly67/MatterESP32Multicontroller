@@ -50,6 +50,7 @@ type IOPin struct {
 	ID          string      `yaml:"id"          json:"id"`
 	Type        string      `yaml:"type"         json:"type"`
 	Label       string      `yaml:"label"        json:"label"`
+	Default     string      `yaml:"default,omitempty" json:"default,omitempty"`
 	Constraints Constraints `yaml:"constraints,omitempty" json:"constraints,omitempty"`
 }
 
