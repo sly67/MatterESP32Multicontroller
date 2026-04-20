@@ -1,0 +1,143 @@
+id: drv8833-led-mono
+name: "DRV8833 Mono LED Strip (A Channel, bipolar drive)"
+version: "1.0"
+category: driver
+io:
+  - id: AIN1
+    type: digital_pwm_out
+    label: "Bridge A Input 1 → AOUT1 (half A)"
+    constraints:
+      pwm: {frequency_hz: 15000, duty_min: 0.0, duty_max: 0.5, resolution_bits: 12}
+  - id: AIN2
+    type: digital_pwm_out
+    label: "Bridge A Input 2 → AOUT2 (half B)"
+    constraints:
+      pwm: {frequency_hz: 15000, duty_min: 0.0, duty_max: 0.5, resolution_bits: 12}
+  - id: LEDC_TIMER
+    type: config
+    label: "LEDC Timer index (0–3)"
+  - id: LEDC_CHAN_A
+    type: config
+    label: "LEDC Channel for AIN1 (0–5)"
+  - id: LEDC_CHAN_B
+    type: config
+    label: "LEDC Channel for AIN2 (0–5)"
+pin_groups:
+  # Anti-parallel mono-color LEDs — bipolar drive alternates current direction
+  # at high frequency so both physical halves light simultaneously.
+  # DRV8833 hpoint-offset on channel B (half-period) prevents overlap; no dead time needed.
+  - {id: bridge_A, pins: [AIN1, AIN2], mode: complementary}
+matter:
+  endpoint_type: dimmable_light
+  behaviors: [on_off, level_control]
+esphome:
+  components:
+    - domain: output
+      template: |
+        platform: custom
+        type: float
+        lambda: |-
+          #include "driver/ledc.h"
+          #include <cmath>
+          struct Drv8833Mono : public Component, public FloatOutput {
+            int gpio_a_, gpio_b_;
+            ledc_channel_t ch_a_, ch_b_;
+            ledc_timer_t timer_;
+            Drv8833Mono(int ga, int gb, int t, int ca, int cb)
+              : gpio_a_(ga), gpio_b_(gb), timer_((ledc_timer_t)t),
+                ch_a_((ledc_channel_t)ca), ch_b_((ledc_channel_t)cb) {}
+            void setup() override {
+              ledc_timer_config_t tc = {};
+              tc.speed_mode = LEDC_LOW_SPEED_MODE;
+              tc.duty_resolution = LEDC_TIMER_12_BIT;
+              tc.timer_num = timer_;
+              tc.freq_hz = 15000;
+              tc.clk_cfg = LEDC_AUTO_CLK;
+              ledc_timer_config(&tc);
+              ledc_channel_config_t cc = {};
+              cc.speed_mode = LEDC_LOW_SPEED_MODE;
+              cc.timer_sel = timer_;
+              cc.intr_type = LEDC_INTR_DISABLE;
+              cc.duty = 0;
+              cc.gpio_num = gpio_a_;
+              cc.channel = ch_a_;
+              cc.hpoint = 0;
+              ledc_channel_config(&cc);
+              cc.gpio_num = gpio_b_;
+              cc.channel = ch_b_;
+              cc.hpoint = 2048;
+              ledc_channel_config(&cc);
+            }
+            void write_state(float state) override {
+              float g = powf(state, 2.2f);
+              uint32_t duty = (uint32_t)(g * 2048.0f);
+              ledc_set_duty(LEDC_LOW_SPEED_MODE, ch_a_, duty);
+              ledc_update_duty(LEDC_LOW_SPEED_MODE, ch_a_);
+              ledc_set_duty(LEDC_LOW_SPEED_MODE, ch_b_, duty);
+              ledc_update_duty(LEDC_LOW_SPEED_MODE, ch_b_);
+            }
+          };
+          auto parseG = [](const char *s) -> int {
+            return s[0] == 'G' ? atoi(s + 4) : atoi(s);
+          };
+          auto c = new Drv8833Mono(
+            parseG("{AIN1}"), parseG("{AIN2}"),
+            {LEDC_TIMER}, {LEDC_CHAN_A}, {LEDC_CHAN_B});
+          App.register_component(c);
+          return {c};
+        outputs:
+          - id: {ID}_mono_out
+    - domain: light
+      template: |
+        platform: monochromatic
+        name: "{NAME}"
+        output: {ID}_mono_out
+        gamma_correct: 1.0
+        effects:
+          - strobe:
+          - pulse:
+          - flicker:
+          - lambda:
+              name: Twinkle
+              update_interval: 50ms
+              lambda: |-
+                struct Spark {
+                  uint8_t state, step, wait;
+                  float peak;
+                };
+                static Spark sp[3] = {};
+                static bool init = false;
+                if (!init) {
+                  init = true;
+                  sp[0].wait = 3; sp[1].wait = 12; sp[2].wait = 22;
+                }
+                const uint8_t FADE_IN = 4, HOLD = 2, FADE_OUT = 18;
+                float total = 0.0f;
+                for (int i = 0; i < 3; i++) {
+                  float b = 0.0f;
+                  auto &s = sp[i];
+                  switch (s.state) {
+                    case 0:
+                      if (++s.step >= s.wait) {
+                        s.state = 1; s.step = 0;
+                        s.peak = 0.2f + (rand() % 40) * 0.01f;
+                        s.wait = 5 + rand() % 28;
+                      }
+                      break;
+                    case 1:
+                      b = s.peak * s.step / (float)FADE_IN;
+                      if (++s.step > FADE_IN) { s.state = 2; s.step = 0; }
+                      break;
+                    case 2:
+                      b = s.peak;
+                      if (++s.step > HOLD) { s.state = 3; s.step = 0; }
+                      break;
+                    case 3:
+                      b = s.peak * (1.0f - s.step / (float)FADE_OUT);
+                      if (++s.step > FADE_OUT) { s.state = 0; s.step = 0; }
+                      break;
+                  }
+                  total += b;
+                }
+                if (total > 1.0f) total = 1.0f;
+                id({ID}_mono_out).set_level(total);
