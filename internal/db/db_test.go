@@ -14,7 +14,7 @@ func TestOpen_CreatesTables(t *testing.T) {
 	require.NoError(t, err)
 	defer database.Close()
 
-	expected := []string{"devices", "templates", "modules", "effects", "firmware", "flash_log", "ota_log"}
+	expected := []string{"devices", "templates", "modules", "effects", "firmware", "flash_log", "ota_log", "esphome_jobs"}
 	for _, tbl := range expected {
 		row := database.DB.QueryRow(
 			"SELECT name FROM sqlite_master WHERE type='table' AND name=?", tbl)
