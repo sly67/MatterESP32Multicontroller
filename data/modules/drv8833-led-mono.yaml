@@ -197,6 +197,43 @@ esphome:
                   }
                 }
           - lambda:
+              name: Dual Flicker
+              update_interval: 10ms
+              lambda: |-
+                const int      SIDE_PARAM  = {SIDE};
+                const float    F_MIN       = {MIN_PCT};
+                const float    F_MAX       = {MAX_PCT};
+                const float    F_RANGE     = F_MAX - F_MIN;
+                const float    SMOOTH      = {SMOOTHING};
+                const float    ONE_MINUS_S = 1.0f - SMOOTH;
+                const uint32_t UPD_EVERY   = (uint32_t)(1000.0f / ({SPEED_HZ}) / 10.0f + 0.5f);
+                auto duty_of = [](float b) -> uint32_t {
+                  if (b < 0.0f) b = 0.0f; if (b > 1.0f) b = 1.0f;
+                  uint32_t d = (uint32_t)(powf(b, 2.2f) * 2048.0f);
+                  return d > 2048u ? 2048u : d;
+                };
+                static float    cur_a = {MIN_PCT};
+                static float    cur_b = {MIN_PCT};
+                static float    tgt_a = {MIN_PCT};
+                static float    tgt_b = {MIN_PCT};
+                static uint32_t tick  = 0;
+                cur_a += (tgt_a - cur_a) * ONE_MINUS_S;
+                cur_b += (tgt_b - cur_b) * ONE_MINUS_S;
+                if (++tick >= UPD_EVERY) {
+                  tick = 0;
+                  float rnd_a = F_MIN + (rand() % 1000) * 0.001f * F_RANGE;
+                  float rnd_b = F_MIN + (rand() % 1000) * 0.001f * F_RANGE;
+                  if      (SIDE_PARAM == 0) { tgt_a = rnd_a; tgt_b = F_MIN; }
+                  else if (SIDE_PARAM == 1) { tgt_a = F_MIN; tgt_b = rnd_b; }
+                  else if (SIDE_PARAM == 2) { tgt_a = rnd_a; tgt_b = rnd_b; }
+                  else if (SIDE_PARAM == 3) { tgt_a = rnd_a; tgt_b = F_MAX - (rnd_a - F_MIN); }
+                  else { if (rand() % 2) tgt_a = rnd_a; if (rand() % 2) tgt_b = rnd_b; }
+                }
+                ledc_set_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t){LEDC_CHAN_A}, duty_of(cur_a));
+                ledc_update_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t){LEDC_CHAN_A});
+                ledc_set_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t){LEDC_CHAN_B}, duty_of(cur_b));
+                ledc_update_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t){LEDC_CHAN_B});
+          - lambda:
               name: Twinkle
               update_interval: 50ms
               lambda: |-
