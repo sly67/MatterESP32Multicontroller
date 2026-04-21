@@ -137,8 +137,19 @@ func TestJobs_StreamReturnsEvents(t *testing.T) {
 	json.NewDecoder(w.Body).Decode(&created)
 	id := created["id"]
 
-	// Give queue a moment to process (mock sidecar is fast)
-	time.Sleep(200 * time.Millisecond)
+	// Poll until the job is done (or 3-second deadline) instead of a fixed sleep.
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		pollReq := httptest.NewRequest(http.MethodGet, "/api/jobs/"+id, nil)
+		pollW := httptest.NewRecorder()
+		srv.ServeHTTP(pollW, pollReq)
+		var statusBody map[string]interface{}
+		json.NewDecoder(pollW.Body).Decode(&statusBody) //nolint:errcheck
+		if s, _ := statusBody["Status"].(string); s == "done" || s == "failed" {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 
 	// Stream
 	req2 := httptest.NewRequest(http.MethodGet, "/api/jobs/"+id+"/stream", nil)
@@ -157,4 +168,30 @@ func TestJobs_StreamReturnsEvents(t *testing.T) {
 		}
 	}
 	assert.True(t, found, "SSE stream should contain at least one data line")
+}
+
+func TestJobs_Resubmit(t *testing.T) {
+	srv, _ := newJobsTestServer(t)
+
+	// Create original job
+	body := `{"board":"esp32-c3","device_name":"ResubmitTest","components":[]}`
+	req := httptest.NewRequest(http.MethodPost, "/api/jobs", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	require.Equal(t, http.StatusAccepted, w.Code)
+	var created map[string]string
+	json.NewDecoder(w.Body).Decode(&created) //nolint:errcheck
+	origID := created["id"]
+
+	// Resubmit
+	req2 := httptest.NewRequest(http.MethodPost, "/api/jobs/"+origID+"/resubmit", nil)
+	w2 := httptest.NewRecorder()
+	srv.ServeHTTP(w2, req2)
+	require.Equal(t, http.StatusAccepted, w2.Code)
+	var resubmitted map[string]string
+	json.NewDecoder(w2.Body).Decode(&resubmitted) //nolint:errcheck
+	newID := resubmitted["id"]
+	assert.NotEmpty(t, newID)
+	assert.NotEqual(t, origID, newID, "resubmit must create a new job with a different ID")
 }

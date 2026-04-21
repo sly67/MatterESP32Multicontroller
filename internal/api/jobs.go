@@ -2,13 +2,17 @@ package api
 
 import (
 	"crypto/rand"
+	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/karthangar/matteresp32hub/internal/db"
@@ -23,7 +27,7 @@ func jobsRouter(queue *esphome.Queue, database *db.Database) func(chi.Router) {
 		r.Get("/{id}/stream", streamJob(queue))
 		r.Delete("/{id}", cancelJob(queue))
 		r.Post("/{id}/resubmit", resubmitJob(queue, database))
-		r.Get("/{id}/firmware", serveFirmware(database))
+		r.Get("/{id}/firmware", serveFirmware(database, queue.DataDir()))
 	}
 }
 
@@ -103,7 +107,11 @@ func getJob(database *db.Database) http.HandlerFunc {
 		id := chi.URLParam(r, "id")
 		job, err := database.GetJob(id)
 		if err != nil {
-			http.Error(w, "not found", http.StatusNotFound)
+			if errors.Is(err, sql.ErrNoRows) {
+				http.Error(w, "job not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -164,7 +172,11 @@ func resubmitJob(queue *esphome.Queue, database *db.Database) http.HandlerFunc {
 		id := chi.URLParam(r, "id")
 		job, err := database.GetJob(id)
 		if err != nil {
-			http.Error(w, "not found", http.StatusNotFound)
+			if errors.Is(err, sql.ErrNoRows) {
+				http.Error(w, "job not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
 		var cfg esphome.JobConfig
@@ -183,7 +195,7 @@ func resubmitJob(queue *esphome.Queue, database *db.Database) http.HandlerFunc {
 	}
 }
 
-func serveFirmware(database *db.Database) http.HandlerFunc {
+func serveFirmware(database *db.Database, dataDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
 		job, err := database.GetJob(id)
@@ -191,7 +203,12 @@ func serveFirmware(database *db.Database) http.HandlerFunc {
 			http.Error(w, "firmware not available", http.StatusNotFound)
 			return
 		}
-		f, err := os.Open(job.BinaryPath)
+		cleanPath := filepath.Clean(job.BinaryPath)
+		if !strings.HasPrefix(cleanPath, filepath.Clean(dataDir)+string(os.PathSeparator)) {
+			http.Error(w, "firmware not available", http.StatusNotFound)
+			return
+		}
+		f, err := os.Open(cleanPath)
 		if err != nil {
 			http.Error(w, "firmware not available", http.StatusNotFound)
 			return

@@ -71,6 +71,9 @@ type Queue struct {
 	notify   chan struct{}
 }
 
+// DataDir returns the data directory used by this Queue.
+func (q *Queue) DataDir() string { return q.dataDir }
+
 // NewQueue creates a Queue and starts the background worker and purge goroutines.
 func NewQueue(database *db.Database, sidecar *Client, dataDir string) *Queue {
 	q := &Queue{
