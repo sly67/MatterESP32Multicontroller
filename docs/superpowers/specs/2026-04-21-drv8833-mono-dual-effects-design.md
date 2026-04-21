@@ -2,7 +2,7 @@
 
 ## Goal
 
-Add four parameterised effects to the `drv8833-led-mono` module that control the left side (LEDC_CHAN_A / AIN1) and right side (LEDC_CHAN_B / AIN2) independently: **Dual Strobe**, **Dual Breathing**, **Dual Flicker**, and **Dual Flame**. Extend the ESPHome assembler to support effect-param substitution so each effect's behaviour can be tuned at compile time via the existing job-creation API.
+Add five parameterised effects to the `drv8833-led-mono` module that control the left side (LEDC_CHAN_A / AIN1) and right side (LEDC_CHAN_B / AIN2) independently: **Dual Strobe**, **Dual Breathing**, **Dual Flicker**, **Dual Flame**, and **Dual Twinkle**. Extend the ESPHome assembler to support effect-param substitution so each effect's behaviour can be tuned at compile time via the existing job-creation API.
 
 ---
 
@@ -227,6 +227,49 @@ Alternating: right uses same state machine but with phase offset of ~3 ticks
 
 ---
 
+### Dual Twinkle
+
+Replaces and extends the existing hardcoded Twinkle effect in the module. Each side runs its own independent set of sparks. The existing effect used 3 overlapping sparks with fixed timing; this version makes spark count, brightness range, and speed configurable and adds per-side control.
+
+**Effect file:** `data/effects/twinkle-dual-effect.yaml`
+
+No `alternating` mode — twinkle is stochastic and the anti-phase concept doesn't apply cleanly. `random` re-rolls the active side each time a new spark is born.
+
+| Param ID | Type | Default | Min | Max | Description |
+|----------|------|---------|-----|-----|-------------|
+| TWINKLE_SIDE | enum(int) | 2 | — | — | 0=left 1=right 2=both 4=random |
+| TWINKLE_MIN_PCT | float | 0.0 | 0.0 | 1.0 | Floor brightness between sparks |
+| TWINKLE_MAX_PCT | float | 0.6 | 0.0 | 1.0 | Max peak brightness of a single spark |
+| TWINKLE_SPEED | float | 1.0 | 0.1 | 5.0 | Speed multiplier — scales fade-in/hold/fade-out step counts |
+| TWINKLE_DENSITY | int | 3 | 1 | 6 | Number of overlapping sparks per active side |
+
+**Lambda logic (50 ms tick — same as existing Twinkle):**
+
+```
+Per side: array of TWINKLE_DENSITY Spark structs, each with state machine:
+  State 0 (wait):     count down random wait ticks, then launch
+  State 1 (fade in):  brightness ramps from 0 → peak over FADE_IN ticks
+  State 2 (hold):     brightness stays at peak for HOLD ticks
+  State 3 (fade out): brightness ramps from peak → 0 over FADE_OUT ticks
+
+FADE_IN  = (uint32_t)(4  / TWINKLE_SPEED)   clamped to >= 1
+HOLD     = (uint32_t)(2  / TWINKLE_SPEED)   clamped to >= 1
+FADE_OUT = (uint32_t)(18 / TWINKLE_SPEED)   clamped to >= 1
+peak of each spark = rand in [TWINKLE_MIN_PCT, TWINKLE_MAX_PCT]
+wait ticks = rand in [5, 32] / TWINKLE_SPEED
+
+Sum contributions from all sparks on a side, clamp to TWINKLE_MAX_PCT.
+
+Side behaviour:
+  both (2):   left and right each run their own independent spark arrays
+  left (0):   only left sparks active; right held at TWINKLE_MIN_PCT
+  right (1):  only right sparks active; left held at TWINKLE_MIN_PCT
+  random (4): each spark independently picks left or right when it launches
+              (gives organic mix — both sides light but unpredictably)
+```
+
+---
+
 ## Files Changed
 
 | File | Change |
@@ -238,7 +281,8 @@ Alternating: right uses same state machine but with phase offset of ~3 ticks
 | `data/effects/breathing-dual-effect.yaml` | New — effect metadata + param defaults |
 | `data/effects/flicker-dual-effect.yaml` | New — effect metadata + param defaults |
 | `data/effects/flame-dual-effect.yaml` | New — effect metadata + param defaults |
-| `data/modules/drv8833-led-mono.yaml` | Add 4 lambda effect blocks with `{PARAM}` placeholders |
+| `data/effects/twinkle-dual-effect.yaml` | New — effect metadata + param defaults |
+| `data/modules/drv8833-led-mono.yaml` | Replace hardcoded Twinkle; add 5 lambda effect blocks with `{PARAM}` placeholders |
 | `internal/esphome/assembler_test.go` | Tests for effect param substitution |
 
 ---
