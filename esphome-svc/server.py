@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-import json, os, signal, subprocess, threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
+import json, os, re, signal, subprocess, threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 PORT = 6052
 _lock = threading.Lock()
@@ -22,7 +22,10 @@ class Handler(BaseHTTPRequestHandler):
         with _lock:
             p = _proc
         if p and p.poll() is None:
-            p.send_signal(signal.SIGTERM)
+            try:
+                p.send_signal(signal.SIGTERM)
+            except ProcessLookupError:
+                pass
         self._send(204, b'')
 
     def do_POST(self):
@@ -33,26 +36,30 @@ class Handler(BaseHTTPRequestHandler):
         if not device:
             self._send(400, b'missing device'); return
 
-        with _lock:
-            if _proc is not None and _proc.poll() is None:
-                self._send(409, b'compile in progress'); return
+        # Fix 4: validate device name to prevent path traversal
+        if not re.fullmatch(r'[a-zA-Z0-9_-]+', device):
+            self._send(400, b'invalid device name'); return
 
         cfg_path = f'/config/{device}/config.yaml'
         if not os.path.exists(cfg_path):
             body = json.dumps({'result': 'error', 'message': 'config not found'}).encode()
             self._send(400, body); return
 
+        # Fix 3: hold lock across 409 check AND Popen to prevent TOCTOU race
+        # Fix 6: send 200 headers only after Popen succeeds
+        with _lock:
+            if _proc is not None and _proc.poll() is None:
+                self._send(409, b'compile in progress'); return
+            proc = subprocess.Popen(
+                ['esphome', 'compile', cfg_path],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+            )
+            _proc = proc
+
+        # Fix 1 (ThreadingHTTPServer) + Fix 2 (no Transfer-Encoding: chunked)
         self.send_response(200)
         self.send_header('Content-Type', 'application/x-ndjson')
-        self.send_header('Transfer-Encoding', 'chunked')
         self.end_headers()
-
-        proc = subprocess.Popen(
-            ['esphome', 'compile', cfg_path],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-        )
-        with _lock:
-            _proc = proc
 
         try:
             for line in proc.stdout:
@@ -86,6 +93,6 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
 if __name__ == '__main__':
-    server = HTTPServer(('0.0.0.0', PORT), Handler)
+    server = ThreadingHTTPServer(('0.0.0.0', PORT), Handler)
     print(f'ESPHome sidecar listening on :{PORT}', flush=True)
     server.serve_forever()
