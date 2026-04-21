@@ -1,5 +1,6 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
+  import 'esp-web-tools';
 
   export let jobId = '';
 
@@ -119,13 +120,20 @@
     {/if}
 
     {#if status === 'done'}
-      <div class="alert alert-success mb-4">
-        Firmware compiled successfully.
+      <div class="alert alert-success mb-4 flex-col items-start gap-3">
+        <span>Firmware compiled successfully.</span>
         {#if job?.binary_path}
-          <a href={`/api/jobs/${jobId}/firmware`}
-             class="btn btn-sm btn-outline ml-auto" download>Download .bin</a>
+          <div class="flex flex-wrap gap-2">
+            <esp-web-install-button manifest={`/api/jobs/${jobId}/manifest.json`}>
+              <button slot="activate" class="btn btn-sm btn-primary">Flash device</button>
+            </esp-web-install-button>
+            <a href={`/api/jobs/${jobId}/firmware`}
+               class="btn btn-sm btn-outline" download>Download .bin</a>
+            <button class="btn btn-sm btn-outline" on:click={recompile}>Re-compile</button>
+          </div>
+        {:else}
+          <button class="btn btn-sm btn-outline" on:click={recompile}>Re-compile</button>
         {/if}
-        <button class="btn btn-sm btn-outline" on:click={recompile}>Re-compile</button>
       </div>
     {/if}
 

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+
 	"net/http"
 	"os"
 	"path/filepath"
@@ -28,6 +29,7 @@ func jobsRouter(queue *esphome.Queue, database *db.Database) func(chi.Router) {
 		r.Delete("/{id}", cancelJob(queue))
 		r.Post("/{id}/resubmit", resubmitJob(queue, database))
 		r.Get("/{id}/firmware", serveFirmware(database, queue.DataDir()))
+		r.Get("/{id}/manifest.json", serveJobManifest(database))
 	}
 }
 
@@ -217,5 +219,48 @@ func serveFirmware(database *db.Database, dataDir string) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Header().Set("Content-Disposition", `attachment; filename="firmware-factory.bin"`)
 		io.Copy(w, f) //nolint:errcheck
+	}
+}
+
+func serveJobManifest(database *db.Database) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		job, err := database.GetJob(id)
+		if err != nil || job.BinaryPath == "" || job.Status != "done" {
+			http.Error(w, "firmware not available", http.StatusNotFound)
+			return
+		}
+		var cfg esphome.JobConfig
+		json.Unmarshal([]byte(job.ConfigJSON), &cfg) //nolint:errcheck
+		chipFamily := boardToChipFamilyJob(cfg.Board)
+		manifest := map[string]interface{}{
+			"name":    job.DeviceName,
+			"version": id[:6],
+			"builds": []map[string]interface{}{
+				{
+					"chipFamily": chipFamily,
+					"parts": []map[string]interface{}{
+						{"path": fmt.Sprintf("/api/jobs/%s/firmware", id), "offset": 0},
+					},
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(manifest) //nolint:errcheck
+	}
+}
+
+func boardToChipFamilyJob(board string) string {
+	switch board {
+	case "esp32-c3", "esp32-c3-devkitm-1":
+		return "ESP32-C3"
+	case "esp32-s3":
+		return "ESP32-S3"
+	case "esp32-s2":
+		return "ESP32-S2"
+	case "esp32-h2":
+		return "ESP32-H2"
+	default:
+		return "ESP32-C3"
 	}
 }

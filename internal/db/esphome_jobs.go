@@ -7,16 +7,16 @@ import (
 
 // ESPHomeJob is a row in the esphome_jobs table.
 type ESPHomeJob struct {
-	ID         string
-	DeviceID   string
-	DeviceName string
-	ConfigJSON string
-	Status     string
-	Log        string
-	BinaryPath string
-	Error      string
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	ID         string    `json:"id"`
+	DeviceID   string    `json:"device_id"`
+	DeviceName string    `json:"device_name"`
+	ConfigJSON string    `json:"config_json"`
+	Status     string    `json:"status"`
+	Log        string    `json:"log"`
+	BinaryPath string    `json:"binary_path"`
+	Error      string    `json:"error"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 // CreateJob inserts a new job row.
