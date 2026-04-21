@@ -34,6 +34,14 @@ services:
     environment:
       - DATA_DIR=/data
       - FIRMWARE_SRC_DIR=/firmware-src
-      - ESPHOME_CACHE_VOLUME=/Portainer/MatterESP32/esphome-cache
-      - PIO_HOME_VOLUME=/Portainer/MatterESP32/pio-home
+      - ESPHOME_SVC_URL=http://esphome-svc:6052
 
+  esphome-svc:
+    build:
+      context: .
+      dockerfile: Dockerfile.esphome
+    container_name: esphome-svc
+    restart: unless-stopped
+    volumes:
+      - /Portainer/MatterESP32/esphome-cache:/config
+      - /Portainer/MatterESP32/pio-home:/root/.platformio

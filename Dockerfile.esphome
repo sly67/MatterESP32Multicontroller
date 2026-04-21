@@ -1,0 +1,3 @@
+FROM ghcr.io/esphome/esphome:latest
+COPY esphome-svc/server.py /server.py
+ENTRYPOINT ["python3", "/server.py"]
