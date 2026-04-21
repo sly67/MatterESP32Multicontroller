@@ -72,9 +72,9 @@ func (c *Client) Compile(ctx context.Context, device string, logWriter io.Writer
 }
 
 // Cancel calls DELETE /compile on the sidecar to SIGTERM the running compile.
-func (c *Client) Cancel() error {
+func (c *Client) Cancel(ctx context.Context) error {
 	url := fmt.Sprintf("%s/compile", c.baseURL)
-	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return err
 	}
@@ -83,6 +83,9 @@ func (c *Client) Cancel() error {
 		return err
 	}
 	resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("cancel HTTP %d", resp.StatusCode)
+	}
 	return nil
 }
 
