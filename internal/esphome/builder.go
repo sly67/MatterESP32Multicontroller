@@ -14,23 +14,32 @@ const compileTimeout = 15 * time.Minute
 
 // Builder compiles ESPHome YAML into firmware binaries using a one-shot Docker container.
 type Builder struct {
-	cacheDir  string
-	volumeRef string // Docker volume name or host path for the -v bind; equals cacheDir when empty
+	cacheDir     string
+	volumeRef    string // Docker volume source for /config bind mount
+	pioVolumeRef string // Docker volume source for /root/.platformio (Python venv cache)
 }
 
 // NewBuilder creates a Builder that will use cacheDir for ESPHome build artifacts.
-// volumeRef is the Docker volume source for the bind mount into the ESPHome container.
-// Pass a named volume (e.g. "esphome-cache") when the server itself runs inside Docker so
-// that both containers share the same volume rather than a container-internal path.
-// If volumeRef is empty, cacheDir is used as the bind mount source (suitable for local dev).
-func NewBuilder(cacheDir, volumeRef string) (*Builder, error) {
+// volumeRef is the Docker volume source for the /config bind mount into the ESPHome container.
+// pioDir/pioVolumeRef follow the same pattern for the PlatformIO home (/root/.platformio),
+// which caches the Python venv and avoids re-downloading it on every compile.
+// Pass empty strings for pioDir/pioVolumeRef to skip PIO home caching.
+func NewBuilder(cacheDir, volumeRef, pioDir, pioVolumeRef string) (*Builder, error) {
 	if err := os.MkdirAll(cacheDir, 0755); err != nil {
 		return nil, fmt.Errorf("create cache dir: %w", err)
 	}
 	if volumeRef == "" {
 		volumeRef = cacheDir
 	}
-	return &Builder{cacheDir: cacheDir, volumeRef: volumeRef}, nil
+	if pioDir != "" {
+		if err := os.MkdirAll(pioDir, 0755); err != nil {
+			return nil, fmt.Errorf("create pio dir: %w", err)
+		}
+		if pioVolumeRef == "" {
+			pioVolumeRef = pioDir
+		}
+	}
+	return &Builder{cacheDir: cacheDir, volumeRef: volumeRef, pioVolumeRef: pioVolumeRef}, nil
 }
 
 // Close is a no-op (kept for API symmetry).
@@ -70,14 +79,20 @@ func (b *Builder) Compile(ctx context.Context, deviceName string, yaml string, l
 
 	deviceSlug := slug(deviceName)
 
-	cmd := exec.CommandContext(ctx,
-		"docker", "run", "--rm",
+	args := []string{
+		"run", "--rm",
 		"--network", "host",
-		"-v", b.volumeRef+":/config",
+		"-v", b.volumeRef + ":/config",
+	}
+	if b.pioVolumeRef != "" {
+		args = append(args, "-v", b.pioVolumeRef+":/root/.platformio")
+	}
+	args = append(args,
 		"ghcr.io/esphome/esphome:latest",
 		"compile",
 		"/config/"+deviceSlug+"/config.yaml",
 	)
+	cmd := exec.CommandContext(ctx, "docker", args...)
 	cmd.Stdout = logWriter
 	cmd.Stderr = logWriter
 

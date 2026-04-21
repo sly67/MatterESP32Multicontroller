@@ -146,7 +146,7 @@ func runESPHomeFlash(database *db.Database) http.HandlerFunc {
 		if dataDir == "" {
 			dataDir = "./data"
 		}
-		builder, err := esphome.NewBuilder(dataDir+"/esphome-cache", os.Getenv("ESPHOME_CACHE_VOLUME"))
+		builder, err := esphome.NewBuilder(dataDir+"/esphome-cache", os.Getenv("ESPHOME_CACHE_VOLUME"), dataDir+"/pio-home", os.Getenv("PIO_HOME_VOLUME"))
 		if err != nil {
 			http.Error(w, "builder init: "+err.Error(), http.StatusInternalServerError)
 			return

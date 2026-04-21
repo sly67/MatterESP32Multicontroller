@@ -457,7 +457,7 @@ func prepareWebFlashESPHome(database *db.Database, dataDir string) http.HandlerF
 			return
 		}
 
-		builder, err := esphome.NewBuilder(dataDir+"/esphome-cache", os.Getenv("ESPHOME_CACHE_VOLUME"))
+		builder, err := esphome.NewBuilder(dataDir+"/esphome-cache", os.Getenv("ESPHOME_CACHE_VOLUME"), dataDir+"/pio-home", os.Getenv("PIO_HOME_VOLUME"))
 		if err != nil {
 			sendLine(map[string]interface{}{"ok": false, "error": "builder: " + err.Error()})
 			return

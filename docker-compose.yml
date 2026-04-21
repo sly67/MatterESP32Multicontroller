@@ -23,6 +23,7 @@ services:
       # run the firmware builder image. Only needed for the Build feature.
       - /var/run/docker.sock:/var/run/docker.sock
       - /Portainer/MatterESP32/esphome-cache:/data/esphome-cache
+      - /Portainer/MatterESP32/pio-home:/data/pio-home
     # Dynamic USB serial access — devices appear automatically when plugged in,
     # no container restart needed. cgroup rules grant access by device class:
     #   188 = ttyUSB (CH340, CP210x, FTDI…)
@@ -34,4 +35,5 @@ services:
       - DATA_DIR=/data
       - FIRMWARE_SRC_DIR=/firmware-src
       - ESPHOME_CACHE_VOLUME=/Portainer/MatterESP32/esphome-cache
+      - PIO_HOME_VOLUME=/Portainer/MatterESP32/pio-home
 
