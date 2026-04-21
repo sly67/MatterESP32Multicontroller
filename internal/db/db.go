@@ -86,6 +86,10 @@ func Open(path string) (*Database, error) {
 		}
 	}
 
+	// Reset any jobs left in pending/running state from a previous crash.
+	// CREATE TABLE IF NOT EXISTS in schema.sql is idempotent — no extra guard needed for the table.
+	sqldb.Exec(`UPDATE esphome_jobs SET status = 'failed', error = 'hub restarted', updated_at = CURRENT_TIMESTAMP WHERE status IN ('pending','running')`) //nolint:errcheck
+
 	return &Database{DB: sqldb}, nil
 }
 

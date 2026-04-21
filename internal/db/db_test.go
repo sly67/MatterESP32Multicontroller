@@ -2,6 +2,7 @@ package db_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/karthangar/matteresp32hub/internal/db"
 	"github.com/stretchr/testify/assert"
@@ -122,4 +123,85 @@ func TestDevice_ESPHomeAPIKey(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "apikey123", got.ESPHomeAPIKey)
 	assert.Equal(t, `{"ota_password":"otapass"}`, got.ESPHomeConfig)
+}
+
+func TestESPHomeJob_CRUD(t *testing.T) {
+	database, err := db.Open(":memory:")
+	require.NoError(t, err)
+	defer database.Close()
+
+	job := db.ESPHomeJob{
+		ID:         "aabbcc",
+		DeviceName: "Hub4",
+		ConfigJSON: `{"board":"esp32-c3"}`,
+		Status:     "pending",
+	}
+	require.NoError(t, database.CreateJob(job))
+
+	got, err := database.GetJob("aabbcc")
+	require.NoError(t, err)
+	assert.Equal(t, "aabbcc", got.ID)
+	assert.Equal(t, "Hub4", got.DeviceName)
+	assert.Equal(t, "pending", got.Status)
+
+	require.NoError(t, database.UpdateJobStatus("aabbcc", "running", "", ""))
+	got, err = database.GetJob("aabbcc")
+	require.NoError(t, err)
+	assert.Equal(t, "running", got.Status)
+
+	require.NoError(t, database.AppendJobLog("aabbcc", "line1"))
+	require.NoError(t, database.AppendJobLog("aabbcc", "line2"))
+	got, err = database.GetJob("aabbcc")
+	require.NoError(t, err)
+	assert.Contains(t, got.Log, "line1")
+	assert.Contains(t, got.Log, "line2")
+
+	require.NoError(t, database.UpdateJobDone("aabbcc", "/data/esphome-builds/aabbcc.bin", "dev-1"))
+	got, err = database.GetJob("aabbcc")
+	require.NoError(t, err)
+	assert.Equal(t, "done", got.Status)
+	assert.Equal(t, "/data/esphome-builds/aabbcc.bin", got.BinaryPath)
+	assert.Equal(t, "dev-1", got.DeviceID)
+
+	list, err := database.ListJobs()
+	require.NoError(t, err)
+	require.Len(t, list, 1)
+}
+
+func TestESPHomeJob_ResetStale(t *testing.T) {
+	database, err := db.Open(":memory:")
+	require.NoError(t, err)
+	defer database.Close()
+
+	for _, s := range []string{"pending", "running", "done", "failed"} {
+		require.NoError(t, database.CreateJob(db.ESPHomeJob{
+			ID: s, DeviceName: "d", ConfigJSON: "{}", Status: s,
+		}))
+	}
+	require.NoError(t, database.ResetStaleJobs())
+
+	for _, id := range []string{"pending", "running"} {
+		got, err := database.GetJob(id)
+		require.NoError(t, err)
+		assert.Equal(t, "failed", got.Status, "job %s should be failed after reset", id)
+	}
+	for _, id := range []string{"done", "failed"} {
+		got, err := database.GetJob(id)
+		require.NoError(t, err)
+		assert.Equal(t, id, got.Status, "job %s should be unchanged after reset", id)
+	}
+}
+
+func TestESPHomeJob_DeleteOld(t *testing.T) {
+	database, err := db.Open(":memory:")
+	require.NoError(t, err)
+	defer database.Close()
+
+	require.NoError(t, database.CreateJob(db.ESPHomeJob{
+		ID: "old", DeviceName: "d", ConfigJSON: "{}", Status: "done",
+	}))
+	// Use a future cutoff to delete the just-created job
+	require.NoError(t, database.DeleteOldJobs(time.Now().Add(time.Hour)))
+	_, err = database.GetJob("old")
+	assert.Error(t, err, "old job should be deleted")
 }

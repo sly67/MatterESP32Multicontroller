@@ -66,3 +66,19 @@ CREATE TABLE IF NOT EXISTS ota_log (
 );
 
 CREATE INDEX IF NOT EXISTS idx_devices_name ON devices(name);
+
+CREATE TABLE IF NOT EXISTS esphome_jobs (
+    id          TEXT PRIMARY KEY,
+    device_id   TEXT,
+    device_name TEXT NOT NULL,
+    config_json TEXT NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'pending',
+    log         TEXT NOT NULL DEFAULT '',
+    binary_path TEXT NOT NULL DEFAULT '',
+    error       TEXT NOT NULL DEFAULT '',
+    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_esphome_jobs_device ON esphome_jobs(device_id);
+CREATE INDEX IF NOT EXISTS idx_esphome_jobs_created ON esphome_jobs(created_at DESC);
