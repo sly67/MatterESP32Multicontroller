@@ -123,40 +123,24 @@
   async function bfEspDoCompile() {
     bfEspError = '';
     bfEspCompiling = true;
-    bfEspLogs = [];
-    bfEspToken = '';
     try {
-      const res = await fetch('/api/webflash/esphome-prepare', {
+      const res = await fetch('/api/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           board:          bfEspBoard,
-          components:     bfEspComponents,
+          components:     bfEspComponents.map(c => ({ type: c.type, name: c.name, pins: c.pins })),
           device_name:    bfEspDeviceName,
           wifi_ssid:      bfEspWifiSSID,
           wifi_password:  bfEspWifiPassword,
           ha_integration: bfEspHA,
         }),
       });
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop();
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try {
-            const obj = JSON.parse(line);
-            if (obj.log !== undefined) bfEspLogs = [...bfEspLogs, obj.log];
-            else if (obj.ok) { bfEspToken = obj.token; bfEspStep = 5; }
-            else bfEspError = obj.error || 'compile failed';
-          } catch {}
-        }
-      }
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      window.dispatchEvent(new CustomEvent('navigate', {
+        detail: { view: 'jobmonitor', jobId: data.id }
+      }));
     } catch (e) {
       bfEspError = e.message;
     } finally {
@@ -754,20 +738,13 @@
         </div>
 
       {:else if bfEspStep === 4}
-        <div class="flex flex-col gap-3">
-          <div class="text-sm font-semibold">
-            {bfEspCompiling ? 'Compiling… (may take several minutes on first flash)' : bfEspError ? 'Compilation failed' : 'Compilation done — plug in your device and flash'}
-          </div>
-          <div class="bg-base-300 rounded p-2 h-48 overflow-y-auto font-mono text-xs">
-            {#each bfEspLogs as line}<div>{line}</div>{/each}
-            {#if bfEspCompiling}<div class="animate-pulse">▋</div>{/if}
-          </div>
-          {#if bfEspError}
-            <div class="alert alert-error text-xs">{bfEspError}</div>
-            <div class="flex gap-2">
-              <button class="btn btn-ghost btn-sm" on:click={() => bfEspStep = 3}>← Back</button>
-              <button class="btn btn-warning btn-sm" on:click={bfEspDoCompile}>↺ Retry</button>
-            </div>
+        <div class="flex flex-col items-center gap-4 py-8">
+          {#if bfEspCompiling}
+            <span class="loading loading-spinner loading-lg"></span>
+            <span class="text-sm">Submitting compile job…</span>
+          {:else if bfEspError}
+            <div class="alert alert-error w-full">{bfEspError}</div>
+            <button class="btn btn-primary" on:click={bfEspDoCompile}>Retry</button>
           {/if}
         </div>
 

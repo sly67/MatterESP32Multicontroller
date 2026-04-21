@@ -7,6 +7,7 @@
   let error = '';
   let filter = '';
   let loading = true;
+  let latestJobs = {};
 
   let pairModal = null; // { discriminator, passcode, qr_payload } | null
   let qrDataUrl = '';
@@ -32,7 +33,26 @@
     } finally {
       loading = false;
     }
+    try {
+      const jobs = await fetch('/api/jobs').then(r => r.json());
+      const seen = new Set();
+      for (const j of jobs) {
+        if (j.device_id && !seen.has(j.device_id)) {
+          seen.add(j.device_id);
+          latestJobs[j.device_id] = j;
+        }
+      }
+      latestJobs = { ...latestJobs };
+    } catch (_) {}
   });
+
+  const jobBadgeClass = s => ({
+    pending:   'badge-warning',
+    running:   'badge-info',
+    done:      'badge-success',
+    failed:    'badge-error',
+    cancelled: 'badge-ghost',
+  }[s] || 'badge-ghost');
 
   $: filtered = devices.filter(d =>
     (d.name || '').toLowerCase().includes(filter.toLowerCase()) ||
@@ -136,11 +156,18 @@
               <td class="text-sm font-mono">{d.ip || '—'}</td>
               <td class="text-sm text-base-content/50">{d.last_seen ? new Date(d.last_seen).toLocaleString() : '—'}</td>
               <td class="text-sm text-base-content/50">{d.created_at ? new Date(d.created_at).toLocaleDateString() : '—'}</td>
-              <td class="flex gap-1">
+              <td class="flex gap-1 flex-wrap items-center">
                 {#if d.firmware_type === 'esphome'}
                   <button class="btn btn-xs btn-outline" on:click={() => openESPHomeKey(d)}>Key</button>
                 {:else}
                   <button class="btn btn-xs btn-outline" on:click={() => openPairModal(d)}>Pair</button>
+                {/if}
+                {#if latestJobs[d.id]}
+                  {@const lj = latestJobs[d.id]}
+                  <button class="badge badge-sm {jobBadgeClass(lj.status)} cursor-pointer"
+                    on:click={() => window.dispatchEvent(new CustomEvent('navigate', { detail: { view: 'jobmonitor', jobId: lj.id } }))}>
+                    ESPHome: {lj.status}
+                  </button>
                 {/if}
                 <button class="btn btn-xs btn-error btn-outline" on:click={() => { deleteConfirm = d; deleteError = ''; }}>✕</button>
               </td>
