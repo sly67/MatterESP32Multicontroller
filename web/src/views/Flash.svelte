@@ -93,12 +93,7 @@
   let bfEspHA = false;
   let bfEspCompiling = false;
   let bfEspError = '';
-  let bfEspLogs = [];
-  let bfEspToken = '';
-  let bfEspFlashState = 'idle'; // idle | connecting | writing | done | error
-  let bfEspFlashMsg = '';
   let bfEspModules = [];
-  let bfEspInstallEl = null;
 
   async function loadBfEspModules() {
     try {
@@ -148,26 +143,11 @@
     }
   }
 
-  function handleBfEspInstallEvent(e) {
-    const state = e.detail?.state;
-    if (!state) return;
-    if (state === 'finished') { bfEspFlashState = 'done'; bfEspStep = 6; }
-    else if (state === 'error') { bfEspFlashState = 'error'; bfEspFlashMsg = e.detail?.message || 'Flash failed'; }
-    else if (state === 'initializing' || state === 'preparing') { bfEspFlashState = 'connecting'; bfEspFlashMsg = 'Connecting…'; }
-    else if (state === 'writing') { bfEspFlashState = 'writing'; bfEspFlashMsg = e.detail?.details || 'Writing…'; }
-  }
-
-  $: if (bfEspInstallEl) {
-    bfEspInstallEl.removeEventListener('state-changed', handleBfEspInstallEvent);
-    bfEspInstallEl.addEventListener('state-changed', handleBfEspInstallEvent);
-  }
-
   function bfEspReset() {
     bfFirmwareType = 'matter';
     bfEspStep = 1; bfEspBoard = 'esp32-c3'; bfEspComponents = [];
     bfEspDeviceName = ''; bfEspWifiSSID = ''; bfEspWifiPassword = '';
     bfEspHA = false; bfEspCompiling = false; bfEspError = '';
-    bfEspLogs = []; bfEspToken = ''; bfEspFlashState = 'idle'; bfEspFlashMsg = '';
   }
 
   // ── Server Flash (existing wizard) ────────────────────────────────────────
@@ -657,8 +637,6 @@
         <li class="step {bfEspStep >= 2 ? 'step-primary' : ''}">Components</li>
         <li class="step {bfEspStep >= 3 ? 'step-primary' : ''}">Config</li>
         <li class="step {bfEspStep >= 4 ? 'step-primary' : ''}">Compile</li>
-        <li class="step {bfEspStep >= 5 ? 'step-primary' : ''}">Flash</li>
-        <li class="step {bfEspStep >= 6 ? 'step-primary' : ''}">Done</li>
       </ul>
 
       {#if bfEspStep === 1}
@@ -745,60 +723,9 @@
           {:else if bfEspError}
             <div class="alert alert-error w-full">{bfEspError}</div>
             <button class="btn btn-primary" on:click={bfEspDoCompile}>Retry</button>
+          {:else}
+            <span class="text-sm text-success">Job submitted — opening job monitor…</span>
           {/if}
-        </div>
-
-      {:else if bfEspStep === 5}
-        <div class="flex flex-col gap-3">
-          <div class="alert alert-success text-sm">Firmware compiled — plug your ESP32 into <strong>this computer</strong> via USB, then click Connect &amp; Flash.</div>
-          <p class="text-xs text-base-content/50">The device is already registered in the hub database. This step writes the firmware to flash memory.</p>
-          {#if bfEspFlashState === 'error'}
-            <div class="alert alert-error text-sm">{bfEspFlashMsg || 'Flash failed'}</div>
-          {/if}
-          {#if bfEspFlashState !== 'idle' && bfEspFlashState !== 'error' && bfEspFlashState !== 'done'}
-            <div class="flex items-center gap-2 text-sm text-base-content/70">
-              <span class="loading loading-spinner loading-xs"></span>
-              {bfEspFlashMsg}
-            </div>
-          {/if}
-          <div class="flex gap-2 justify-end items-center">
-            {#if bfEspFlashState !== 'idle' && bfEspFlashState !== 'error'}
-              <button class="btn btn-success btn-sm" on:click={() => { bfEspFlashState = 'done'; bfEspStep = 6; }}>
-                ✓ Flash complete — Continue
-              </button>
-            {/if}
-            <esp-web-install-button
-              bind:this={bfEspInstallEl}
-              manifest="/api/webflash/esphome-manifest?token={bfEspToken}"
-            >
-              <button slot="activate" class="btn btn-warning btn-sm"
-                disabled={bfEspFlashState !== 'idle'}>
-                {#if bfEspFlashState !== 'idle' && bfEspFlashState !== 'error'}
-                  <span class="loading loading-spinner loading-xs"></span> Flashing…
-                {:else}
-                  ⚡ Connect &amp; Flash
-                {/if}
-              </button>
-              <span slot="unsupported" class="alert alert-error text-sm">
-                Web Serial not supported — use Chrome or Edge.
-              </span>
-            </esp-web-install-button>
-          </div>
-        </div>
-
-      {:else if bfEspStep === 6}
-        <div class="flex flex-col gap-3">
-          <div class="flex items-center gap-3 p-3 rounded-lg border border-success/40 bg-success/10">
-            <span class="text-xl">✓</span>
-            <div class="flex-1">
-              <div class="font-semibold text-sm">{bfEspDeviceName}</div>
-              <div class="text-xs text-base-content/50">ESPHome flash complete — device rebooting.</div>
-            </div>
-          </div>
-          {#if bfEspHA}
-            <div class="text-xs">The ESPHome API encryption key has been stored. Use the <strong>ESPHome Key</strong> button in the Fleet view to retrieve it for Home Assistant pairing.</div>
-          {/if}
-          <button class="btn btn-ghost btn-sm self-start mt-2" on:click={bfEspReset}>Flash another device</button>
         </div>
       {/if}
     {/if}

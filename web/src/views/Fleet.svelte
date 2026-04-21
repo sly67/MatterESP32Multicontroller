@@ -34,7 +34,9 @@
       loading = false;
     }
     try {
-      const jobs = await fetch('/api/jobs').then(r => r.json());
+      const r = await fetch('/api/jobs');
+      if (!r.ok) throw new Error('jobs fetch failed');
+      const jobs = await r.json();
       const seen = new Set();
       for (const j of jobs) {
         if (j.device_id && !seen.has(j.device_id)) {
