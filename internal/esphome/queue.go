@@ -174,6 +174,28 @@ func (q *Queue) Subscribe(id string) (<-chan Event, func(), error) {
 	}
 
 	q.subsMu.Lock()
+	// Re-read status while holding the write lock to prevent a race where
+	// closeSubscribers runs between our initial status check and registration.
+	recheckJob, recheckErr := q.database.GetJob(id)
+	if recheckErr == nil {
+		switch JobStatus(recheckJob.Status) {
+		case JobDone:
+			q.subsMu.Unlock()
+			ch <- Event{Type: "done", OK: true}
+			close(ch)
+			return ch, func() {}, nil
+		case JobFailed:
+			q.subsMu.Unlock()
+			ch <- Event{Type: "done", ErrorMsg: recheckJob.Error}
+			close(ch)
+			return ch, func() {}, nil
+		case JobCancelled:
+			q.subsMu.Unlock()
+			ch <- Event{Type: "done", ErrorMsg: "cancelled"}
+			close(ch)
+			return ch, func() {}, nil
+		}
+	}
 	q.subs[id] = append(q.subs[id], ch)
 	q.subsMu.Unlock()
 
@@ -253,8 +275,9 @@ type jobLogWriter struct {
 }
 
 func (w *jobLogWriter) Write(p []byte) (int, error) {
-	for _, line := range strings.Split(strings.TrimRight(string(p), "\n"), "\n") {
+	for _, line := range strings.Split(strings.TrimRight(string(p), "\r\n"), "\n") {
 		if line != "" {
+			line = strings.TrimRight(line, "\r")
 			w.queue.database.AppendJobLog(w.jobID, line) //nolint:errcheck
 			w.queue.broadcast(w.jobID, Event{Type: "log", Data: line})
 		}
