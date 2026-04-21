@@ -7,6 +7,7 @@ import (
 	"github.com/karthangar/matteresp32hub/internal/api"
 	"github.com/karthangar/matteresp32hub/internal/config"
 	"github.com/karthangar/matteresp32hub/internal/db"
+	"github.com/karthangar/matteresp32hub/internal/esphome"
 	"github.com/karthangar/matteresp32hub/internal/fwwatch"
 	"github.com/karthangar/matteresp32hub/internal/seed"
 	"github.com/karthangar/matteresp32hub/internal/tlsutil"
@@ -32,22 +33,24 @@ func main() {
 	if err := seed.SeedBuiltins(database); err != nil {
 		log.Fatalf("seed: %v", err)
 	}
-
 	if err := tlsutil.EnsureCerts(certsDir); err != nil {
 		log.Fatalf("tls: %v", err)
 	}
 
 	fwwatch.Start(database, dataDir)
 
-	// Start placeholder OTA server (full implementation in Plan 4)
+	svcURL := envOr("ESPHOME_SVC_URL", "http://localhost:6052")
+	sidecar := esphome.NewClient(svcURL)
+	queue := esphome.NewQueue(database, sidecar, dataDir)
+
 	go func() {
-		otaSrv := api.NewServer(cfg, database, nil, certsDir)
+		otaSrv := api.NewServer(cfg, database, queue, certsDir)
 		if err := otaSrv.ListenAndServeOTA(); err != nil {
 			log.Printf("OTA server: %v", err)
 		}
 	}()
 
-	srv := api.NewServer(cfg, database, nil, certsDir)
+	srv := api.NewServer(cfg, database, queue, certsDir)
 	log.Printf("web UI:  https://0.0.0.0:%d", cfg.WebPort)
 	log.Printf("OTA srv: https://0.0.0.0:%d", cfg.OTAPort)
 	if err := srv.ListenAndServeTLS(); err != nil {

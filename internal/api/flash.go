@@ -1,6 +1,9 @@
 package api
 
 import (
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -107,9 +110,54 @@ func runFlash(database *db.Database) http.HandlerFunc {
 	}
 }
 
-func runESPHomeFlash(_ *db.Database, _ *esphome.Queue) http.HandlerFunc {
-	// TODO(Task 6): wire queue-based ESPHome flash here.
+func runESPHomeFlash(database *db.Database, queue *esphome.Queue) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "ESPHome flash via queue not yet implemented — use /api/jobs", http.StatusNotImplemented)
+		var req struct {
+			DeviceName    string                    `json:"device_name"`
+			WiFiSSID      string                    `json:"wifi_ssid"`
+			WiFiPassword  string                    `json:"wifi_password"`
+			Board         string                    `json:"board"`
+			HAIntegration bool                      `json:"ha_integration"`
+			Components    []esphome.ComponentConfig  `json:"components"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid JSON", http.StatusBadRequest)
+			return
+		}
+		if req.DeviceName == "" || req.Board == "" {
+			http.Error(w, "device_name and board are required", http.StatusBadRequest)
+			return
+		}
+
+		deviceID, _ := randomHex(6)
+		otaBuf := make([]byte, 16)
+		rand.Read(otaBuf) //nolint:errcheck
+		otaPassword := hex.EncodeToString(otaBuf)
+
+		var apiKey string
+		if req.HAIntegration {
+			keyBuf := make([]byte, 32)
+			rand.Read(keyBuf) //nolint:errcheck
+			apiKey = base64.StdEncoding.EncodeToString(keyBuf)
+		}
+
+		id, err := queue.Enqueue(esphome.JobConfig{
+			Board:         req.Board,
+			DeviceName:    req.DeviceName,
+			DeviceID:      deviceID,
+			WiFiSSID:      req.WiFiSSID,
+			WiFiPassword:  req.WiFiPassword,
+			HAIntegration: req.HAIntegration,
+			APIKey:        apiKey,
+			OTAPassword:   otaPassword,
+			Components:    req.Components,
+		})
+		if err != nil {
+			http.Error(w, "enqueue: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusAccepted)
+		json.NewEncoder(w).Encode(map[string]string{"id": id}) //nolint:errcheck
 	}
 }
