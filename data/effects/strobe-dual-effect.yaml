@@ -1,0 +1,11 @@
+id: strobe-dual
+name: "Dual Strobe"
+version: "1.0"
+compatible_with: [drv8833-led-mono]
+params:
+  - {id: SIDE,         type: int,     label: "Side (0=L 1=R 2=Both 3=Alt 4=Rand)", default: 4,   min: 0, max: 4}
+  - {id: MIN_PCT,      type: percent, label: "Min brightness",                      default: 0.0}
+  - {id: MAX_PCT,      type: percent, label: "Max brightness",                      default: 1.0}
+  - {id: FLASH_MS,     type: int,     label: "Flash duration (ms)",                 default: 80,  min: 10,  max: 2000}
+  - {id: PAUSE_MIN_MS, type: int,     label: "Min pause (ms)",                      default: 100, min: 0,   max: 5000}
+  - {id: PAUSE_MAX_MS, type: int,     label: "Max pause (ms)",                      default: 600, min: 0,   max: 5000}

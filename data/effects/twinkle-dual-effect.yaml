@@ -1,0 +1,10 @@
+id: twinkle-dual
+name: "Dual Twinkle"
+version: "1.0"
+compatible_with: [drv8833-led-mono]
+params:
+  - {id: SIDE,    type: int,     label: "Side (0=L 1=R 2=Both 4=Rand)", default: 2,   min: 0, max: 4}
+  - {id: MIN_PCT, type: percent, label: "Floor brightness",              default: 0.0}
+  - {id: MAX_PCT, type: percent, label: "Max spark peak",                default: 0.6}
+  - {id: SPEED,   type: float,   label: "Speed multiplier",             default: 1.0, min: 0.1, max: 5.0}
+  - {id: DENSITY, type: int,     label: "Sparks per active side",       default: 3,   min: 1,   max: 6}

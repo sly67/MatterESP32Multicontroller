@@ -1,0 +1,10 @@
+id: flicker-dual
+name: "Dual Flicker"
+version: "1.0"
+compatible_with: [drv8833-led-mono]
+params:
+  - {id: SIDE,      type: int,     label: "Side (0=L 1=R 2=Both 3=Alt 4=Rand)", default: 2,    min: 0, max: 4}
+  - {id: MIN_PCT,   type: percent, label: "Min brightness",                      default: 0.1}
+  - {id: MAX_PCT,   type: percent, label: "Max brightness",                      default: 1.0}
+  - {id: SPEED_HZ,  type: float,   label: "Update rate (Hz)",                    default: 20.0, min: 1.0, max: 50.0}
+  - {id: SMOOTHING, type: float,   label: "Smoothing (0=instant 0.95=slow)",     default: 0.3,  min: 0.0, max: 0.95}
