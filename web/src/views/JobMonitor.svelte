@@ -45,10 +45,20 @@
         status = ev.ok ? 'done' : 'failed';
         error = ev.error || '';
         es.close();
-        fetch(`/api/jobs/${jobId}`).then(r => r.json()).then(j => { job = j; });
+        if (!loading) {
+          fetch(`/api/jobs/${jobId}`).then(r => r.json()).then(j => { job = j; });
+        }
       }
     };
-    es.onerror = () => {};
+    es.onerror = () => {
+      if (es) {
+        es.close();
+        es = null;
+      }
+      if (status !== 'done' && status !== 'failed' && status !== 'cancelled') {
+        error = 'Connection to server lost. Reload to check job status.';
+      }
+    };
   }
 
   function recompile() {
@@ -86,7 +96,10 @@
         <span class="loading loading-spinner loading-sm"></span>
         {#if position}Queued — position {position}{:else}Waiting in queue…{/if}
         <button class="btn btn-sm btn-ghost ml-auto"
-          on:click={() => fetch(`/api/jobs/${jobId}`, { method: 'DELETE' }).then(() => { status = 'cancelled'; })}>
+          on:click={() => fetch(`/api/jobs/${jobId}`, { method: 'DELETE' }).then(() => {
+            status = 'cancelled';
+            if (es) { es.close(); es = null; }
+          })}>
           Cancel
         </button>
       </div>
@@ -96,7 +109,10 @@
       <div class="flex items-center gap-2 mb-2 text-sm text-info">
         <span class="loading loading-spinner loading-xs"></span> Compiling…
         <button class="btn btn-xs btn-ghost ml-auto"
-          on:click={() => fetch(`/api/jobs/${jobId}`, { method: 'DELETE' })}>
+          on:click={() => fetch(`/api/jobs/${jobId}`, { method: 'DELETE' }).then(() => {
+            status = 'cancelled';
+            if (es) { es.close(); es = null; }
+          })}>
           Cancel
         </button>
       </div>

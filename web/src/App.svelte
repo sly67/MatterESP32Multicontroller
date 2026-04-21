@@ -1,4 +1,5 @@
 <script>
+  import { onMount, onDestroy } from 'svelte';
   import Sidebar    from './lib/Sidebar.svelte';
   import Fleet      from './views/Fleet.svelte';
   import Flash      from './views/Flash.svelte';
@@ -14,14 +15,21 @@
   let current = 'fleet';
   let jobMonitorId = '';
 
-  window.addEventListener('navigate', (e) => {
-    const { view, jobId } = e.detail;
-    if (view === 'jobmonitor' && jobId) {
-      jobMonitorId = jobId;
-      current = 'jobmonitor';
-    } else {
-      current = view;
-    }
+  let handleNavigate;
+  onMount(() => {
+    handleNavigate = (e) => {
+      const { view, jobId } = e.detail;
+      if (view === 'jobmonitor' && jobId) {
+        jobMonitorId = jobId;
+        current = 'jobmonitor';
+      } else {
+        current = view;
+      }
+    };
+    window.addEventListener('navigate', handleNavigate);
+  });
+  onDestroy(() => {
+    if (handleNavigate) window.removeEventListener('navigate', handleNavigate);
   });
 
   const plainViews = {
