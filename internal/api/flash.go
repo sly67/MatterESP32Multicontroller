@@ -129,7 +129,11 @@ func runESPHomeFlash(database *db.Database, queue *esphome.Queue) http.HandlerFu
 			return
 		}
 
-		deviceID, _ := randomHex(6)
+		deviceID, err := randomHex(6)
+		if err != nil {
+			http.Error(w, "device id: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 		otaBuf := make([]byte, 16)
 		rand.Read(otaBuf) //nolint:errcheck
 		otaPassword := hex.EncodeToString(otaBuf)
