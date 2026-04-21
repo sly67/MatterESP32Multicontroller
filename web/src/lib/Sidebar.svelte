@@ -5,6 +5,7 @@
     { section: 'Overview' },
     { id: 'fleet',     label: 'Fleet',          icon: '⊞' },
     { id: 'flash',     label: 'Flash Devices',  icon: '⚡' },
+    { id: 'jobs',      label: 'Compile Jobs',   icon: '⚙' },
     { section: 'Configuration' },
     { id: 'templates', label: 'Templates',      icon: '⚙' },
     { id: 'modules',   label: 'Module Library', icon: '⬡' },
