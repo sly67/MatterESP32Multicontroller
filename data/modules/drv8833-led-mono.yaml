@@ -43,41 +43,41 @@ esphome:
         id: {ID}_mono_out
         type: float
         write_action:
-          - lambda: |-
-              static bool drv_inited = false;
-              if (!drv_inited) {
-                drv_inited = true;
-                const char *sa = "{AIN1}", *sb = "{AIN2}";
-                int ga = sa[0]=='G' ? atoi(sa+4) : atoi(sa);
-                int gb = sb[0]=='G' ? atoi(sb+4) : atoi(sb);
-                ledc_timer_config_t tc = {};
-                tc.speed_mode = LEDC_LOW_SPEED_MODE;
-                tc.duty_resolution = (ledc_timer_bit_t)12;
-                tc.timer_num = (ledc_timer_t){LEDC_TIMER};
-                tc.freq_hz = 15000;
-                tc.clk_cfg = LEDC_AUTO_CLK;
-                ledc_timer_config(&tc);
-                ledc_channel_config_t cc = {};
-                cc.speed_mode = LEDC_LOW_SPEED_MODE;
-                cc.timer_sel = (ledc_timer_t){LEDC_TIMER};
-                cc.intr_type = LEDC_INTR_DISABLE;
-                cc.duty = 0;
-                cc.gpio_num = ga;
-                cc.channel = (ledc_channel_t){LEDC_CHAN_A};
-                cc.hpoint = 0;
-                ledc_channel_config(&cc);
-                cc.gpio_num = gb;
-                cc.channel = (ledc_channel_t){LEDC_CHAN_B};
-                cc.hpoint = 2048;
-                ledc_channel_config(&cc);
-              }
-              float g = powf(x, 2.2f);
-              uint32_t duty = (uint32_t)(g * 2048.0f);
-              if (duty > 2048) duty = 2048;
-              ledc_set_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t){LEDC_CHAN_A}, duty);
-              ledc_update_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t){LEDC_CHAN_A});
-              ledc_set_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t){LEDC_CHAN_B}, duty);
-              ledc_update_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t){LEDC_CHAN_B});
+          lambda: |-
+            static bool drv_inited = false;
+            if (!drv_inited) {
+              drv_inited = true;
+              const char *sa = "{AIN1}", *sb = "{AIN2}";
+              int ga = sa[0]=='G' ? atoi(sa+4) : atoi(sa);
+              int gb = sb[0]=='G' ? atoi(sb+4) : atoi(sb);
+              ledc_timer_config_t tc = {};
+              tc.speed_mode = LEDC_LOW_SPEED_MODE;
+              tc.duty_resolution = (ledc_timer_bit_t)12;
+              tc.timer_num = (ledc_timer_t){LEDC_TIMER};
+              tc.freq_hz = 15000;
+              tc.clk_cfg = LEDC_AUTO_CLK;
+              ledc_timer_config(&tc);
+              ledc_channel_config_t cc = {};
+              cc.speed_mode = LEDC_LOW_SPEED_MODE;
+              cc.timer_sel = (ledc_timer_t){LEDC_TIMER};
+              cc.intr_type = LEDC_INTR_DISABLE;
+              cc.duty = 0;
+              cc.gpio_num = ga;
+              cc.channel = (ledc_channel_t){LEDC_CHAN_A};
+              cc.hpoint = 0;
+              ledc_channel_config(&cc);
+              cc.gpio_num = gb;
+              cc.channel = (ledc_channel_t){LEDC_CHAN_B};
+              cc.hpoint = 2048;
+              ledc_channel_config(&cc);
+            }
+            float g = powf(state, 2.2f);
+            uint32_t duty = (uint32_t)(g * 2048.0f);
+            if (duty > 2048) duty = 2048;
+            ledc_set_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t){LEDC_CHAN_A}, duty);
+            ledc_update_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t){LEDC_CHAN_A});
+            ledc_set_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t){LEDC_CHAN_B}, duty);
+            ledc_update_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t){LEDC_CHAN_B});
     - domain: light
       template: |
         platform: monochromatic
