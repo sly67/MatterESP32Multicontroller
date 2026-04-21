@@ -9,9 +9,10 @@ import (
 
 // ComponentConfig is one component in an ESPHome device.
 type ComponentConfig struct {
-	Type string            `json:"type"` // module ID, e.g. "dht22"
-	Name string            `json:"name"` // user-facing label, e.g. "Room Temp"
-	Pins map[string]string `json:"pins"` // pin role → GPIO, e.g. {"DATA": "GPIO4"}
+	Type         string            `json:"type"`                     // module ID, e.g. "dht22"
+	Name         string            `json:"name"`                     // user-facing label, e.g. "Room Temp"
+	Pins         map[string]string `json:"pins"`                     // pin role → GPIO, e.g. {"DATA": "GPIO4"}
+	EffectParams map[string]string `json:"effect_params,omitempty"` // effect params for substitution, e.g. {"SIDE": "4"}
 }
 
 // Config is the full set of parameters for assembling an ESPHome YAML.
@@ -120,6 +121,9 @@ func Assemble(cfg Config, modules map[string]*yamldef.Module) (string, error) {
 			rendered = strings.ReplaceAll(rendered, "{ID}", idSlug(comp.Name))
 			for role, gpio := range comp.Pins {
 				rendered = strings.ReplaceAll(rendered, "{"+role+"}", gpio)
+			}
+			for key, val := range comp.EffectParams {
+				rendered = strings.ReplaceAll(rendered, "{"+key+"}", val)
 			}
 			entries = append(entries, entry{ec.Domain, rendered})
 			if !domainSeen[ec.Domain] {

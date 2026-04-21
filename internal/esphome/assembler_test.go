@@ -162,3 +162,66 @@ func TestAssemble_UnknownModuleError(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "nonexistent")
 }
+
+func TestAssemble_EffectParamSubstitution(t *testing.T) {
+	mods := map[string]*yamldef.Module{
+		"dual-strip": {
+			ESPHome: &yamldef.ESPHomeDef{
+				Components: []yamldef.ESPHomeComponent{
+					{Domain: "light", Template: "platform: monochromatic\n  name: \"{NAME}\"\n  effects:\n    - lambda:\n        name: Dual Strobe\n        lambda: |-\n          const int SIDE = {SIDE};\n          const float MIN = {MIN_PCT};"},
+				},
+			},
+		},
+	}
+	cfg := esphome.Config{
+		Board: "esp32-c3", DeviceName: "Strip", DeviceID: "dev1",
+		WiFiSSID: "n", WiFiPassword: "p", OTAPassword: "o",
+		Components: []esphome.ComponentConfig{
+			{
+				Type: "dual-strip",
+				Name: "LED Strip",
+				Pins: map[string]string{},
+				EffectParams: map[string]string{
+					"SIDE":    "4",
+					"MIN_PCT": "0.1",
+				},
+			},
+		},
+	}
+	out, err := esphome.Assemble(cfg, mods)
+	require.NoError(t, err)
+	assert.Contains(t, out, "SIDE = 4")
+	assert.Contains(t, out, "MIN = 0.1")
+	assert.NotContains(t, out, "{SIDE}")
+	assert.NotContains(t, out, "{MIN_PCT}")
+}
+
+func TestAssemble_EffectParamsAndPinsCoexist(t *testing.T) {
+	mods := map[string]*yamldef.Module{
+		"m": {
+			ESPHome: &yamldef.ESPHomeDef{
+				Components: []yamldef.ESPHomeComponent{
+					{Domain: "output", Template: "pin: {GPIO}\n  side: {SIDE}"},
+				},
+			},
+		},
+	}
+	cfg := esphome.Config{
+		Board: "esp32-c3", DeviceName: "x", DeviceID: "y",
+		WiFiSSID: "n", WiFiPassword: "p", OTAPassword: "o",
+		Components: []esphome.ComponentConfig{
+			{
+				Type:         "m",
+				Name:         "out",
+				Pins:         map[string]string{"GPIO": "GPIO4"},
+				EffectParams: map[string]string{"SIDE": "2"},
+			},
+		},
+	}
+	out, err := esphome.Assemble(cfg, mods)
+	require.NoError(t, err)
+	assert.Contains(t, out, "GPIO4")
+	assert.Contains(t, out, "side: 2")
+	assert.NotContains(t, out, "{GPIO}")
+	assert.NotContains(t, out, "{SIDE}")
+}
