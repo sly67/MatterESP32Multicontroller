@@ -25,14 +25,10 @@ import (
 	"github.com/karthangar/matteresp32hub/internal/yamldef"
 )
 
-// preparedSession holds flash data keyed by token.
-// For Matter sessions: nvsBin + fwVersion are set.
-// For ESPHome sessions: espBin + espBoard are set.
+// preparedSession holds Matter browser-flash data keyed by token.
 type preparedSession struct {
 	nvsBin    []byte
 	fwVersion string
-	espBin    []byte
-	espBoard  string
 	createdAt time.Time
 }
 
