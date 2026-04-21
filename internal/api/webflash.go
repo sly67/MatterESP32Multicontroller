@@ -1,7 +1,6 @@
 package api
 
 import (
-	"bufio"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/binary"
@@ -13,7 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strings"
 	"sync"
 	"time"
 
@@ -63,7 +61,7 @@ func startSessionGC() {
 	})
 }
 
-func webflashRouter(cfg *config.Config, database *db.Database) func(chi.Router) {
+func webflashRouter(cfg *config.Config, database *db.Database, queue *esphome.Queue) func(chi.Router) {
 	dataDir := cfg.DataDir
 	if dataDir == "" {
 		dataDir = "./data"
@@ -82,7 +80,7 @@ func webflashRouter(cfg *config.Config, database *db.Database) func(chi.Router) 
 		r.Post("/prepare", prepareWebFlash(database))
 
 		// ESPHome browser flash
-		r.Post("/esphome-prepare", prepareWebFlashESPHome(database, dataDir))
+		r.Post("/esphome-prepare", prepareWebFlashESPHome(database, dataDir, queue))
 		r.Get("/esphome-manifest", serveWebFlashESPHomeManifest())
 		r.Get("/esphome-firmware", serveWebFlashESPHomeFirmware())
 
@@ -378,7 +376,8 @@ func boardToChipFamily(board string) string {
 
 // prepareWebFlashESPHome compiles ESPHome firmware for browser flashing.
 // Streams ndjson log lines during compile, then emits a final {ok,token} or {ok:false,error} line.
-func prepareWebFlashESPHome(database *db.Database, dataDir string) http.HandlerFunc {
+// TODO(Task 6): wire queue-based compilation here.
+func prepareWebFlashESPHome(database *db.Database, dataDir string, _ *esphome.Queue) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			Board         string                    `json:"board"`
@@ -457,92 +456,10 @@ func prepareWebFlashESPHome(database *db.Database, dataDir string) http.HandlerF
 			return
 		}
 
-		builder, err := esphome.NewBuilder(dataDir+"/esphome-cache", os.Getenv("ESPHOME_CACHE_VOLUME"), dataDir+"/pio-home", os.Getenv("PIO_HOME_VOLUME"))
-		if err != nil {
-			sendLine(map[string]interface{}{"ok": false, "error": "builder: " + err.Error()})
-			return
-		}
-		defer builder.Close()
-
-		pr, pw := io.Pipe()
-		type binResult struct {
-			bin []byte
-			err error
-		}
-		ch := make(chan binResult, 1)
-		go func() {
-			bin, err := builder.Compile(r.Context(), req.DeviceName, yamlStr, pw)
-			pw.Close()
-			ch <- binResult{bin, err}
-		}()
-
-		// Keepalive: send a ping every 20s when the compiler produces no output,
-		// preventing browser/proxy timeouts during silent phases (e.g. dep download).
-		lineCh := make(chan string)
-		go func() {
-			scanner := bufio.NewScanner(pr)
-			for scanner.Scan() {
-				lineCh <- scanner.Text()
-			}
-			close(lineCh)
-		}()
-		ticker := time.NewTicker(20 * time.Second)
-		defer ticker.Stop()
-	scanLoop:
-		for {
-			select {
-			case line, ok := <-lineCh:
-				if !ok {
-					break scanLoop
-				}
-				if s := strings.TrimSpace(line); s != "" {
-					sendLine(map[string]string{"log": s})
-				}
-				ticker.Reset(20 * time.Second)
-			case <-ticker.C:
-				sendLine(map[string]string{"log": "…"})
-			}
-		}
-
-		res := <-ch
-		if res.err != nil {
-			sendLine(map[string]interface{}{"ok": false, "error": "compile: " + res.err.Error()})
-			return
-		}
-
-		cfgJSON, _ := json.Marshal(struct {
-			Board         string                    `json:"board"`
-			HAIntegration bool                      `json:"ha_integration"`
-			OTAPassword   string                    `json:"ota_password"`
-			Components    []esphome.ComponentConfig `json:"components"`
-		}{req.Board, req.HAIntegration, otaPassword, req.Components})
-
-		if err := database.CreateDevice(db.Device{
-			ID:            deviceID,
-			Name:          req.DeviceName,
-			FirmwareType:  "esphome",
-			ESPHomeConfig: string(cfgJSON),
-			ESPHomeAPIKey: apiKey,
-			PSK:           []byte{},
-		}); err != nil {
-			sendLine(map[string]interface{}{"ok": false, "error": "register device: " + err.Error()})
-			return
-		}
-
-		token, err := randomHex(16)
-		if err != nil {
-			sendLine(map[string]interface{}{"ok": false, "error": "token: " + err.Error()})
-			return
-		}
-		sessionMu.Lock()
-		sessions[token] = &preparedSession{
-			espBin:    res.bin,
-			espBoard:  req.Board,
-			createdAt: time.Now(),
-		}
-		sessionMu.Unlock()
-
-		sendLine(map[string]interface{}{"ok": true, "token": token, "device_id": deviceID})
+		// TODO(Task 6): replace with queue-based compile.
+		_ = yamlStr
+		_ = dataDir
+		sendLine(map[string]interface{}{"ok": false, "error": "ESPHome browser flash not yet implemented — use /api/jobs"})
 	}
 }
 

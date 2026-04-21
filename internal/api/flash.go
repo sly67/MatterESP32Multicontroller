@@ -1,29 +1,24 @@
 package api
 
 import (
-	"bufio"
 	"encoding/json"
-	"io"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/karthangar/matteresp32hub/internal/db"
 	"github.com/karthangar/matteresp32hub/internal/esphome"
 	"github.com/karthangar/matteresp32hub/internal/flash"
-	"github.com/karthangar/matteresp32hub/internal/library"
 	"github.com/karthangar/matteresp32hub/internal/usb"
 	"github.com/karthangar/matteresp32hub/internal/yamldef"
 )
 
-func flashRouter(database *db.Database) func(chi.Router) {
+func flashRouter(database *db.Database, queue *esphome.Queue) func(chi.Router) {
 	return func(r chi.Router) {
 		r.Get("/ports", listPorts)
 		r.Post("/run", runFlash(database))
-		r.Post("/esphome", runESPHomeFlash(database))
+		r.Post("/esphome", runESPHomeFlash(database, queue))
 	}
 }
 
@@ -112,108 +107,9 @@ func runFlash(database *db.Database) http.HandlerFunc {
 	}
 }
 
-func runESPHomeFlash(database *db.Database) http.HandlerFunc {
+func runESPHomeFlash(_ *db.Database, _ *esphome.Queue) http.HandlerFunc {
+	// TODO(Task 6): wire queue-based ESPHome flash here.
 	return func(w http.ResponseWriter, r *http.Request) {
-		var req struct {
-			Port          string                   `json:"port"`
-			DeviceName    string                   `json:"device_name"`
-			WiFiSSID      string                   `json:"wifi_ssid"`
-			WiFiPassword  string                   `json:"wifi_password"`
-			Board         string                   `json:"board"`
-			HAIntegration bool                     `json:"ha_integration"`
-			Components    []esphome.ComponentConfig `json:"components"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "invalid JSON", http.StatusBadRequest)
-			return
-		}
-		if req.Port == "" || req.DeviceName == "" || req.Board == "" {
-			http.Error(w, "port, device_name, and board are required", http.StatusBadRequest)
-			return
-		}
-
-		mods, err := library.LoadModules()
-		if err != nil {
-			http.Error(w, "load modules: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-		modMap := make(map[string]*yamldef.Module, len(mods))
-		for _, m := range mods {
-			modMap[m.ID] = m
-		}
-
-		dataDir := os.Getenv("DATA_DIR")
-		if dataDir == "" {
-			dataDir = "./data"
-		}
-		builder, err := esphome.NewBuilder(dataDir+"/esphome-cache", os.Getenv("ESPHOME_CACHE_VOLUME"), dataDir+"/pio-home", os.Getenv("PIO_HOME_VOLUME"))
-		if err != nil {
-			http.Error(w, "builder init: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-		defer builder.Close()
-
-		w.Header().Set("Content-Type", "application/x-ndjson")
-		w.Header().Set("Transfer-Encoding", "chunked")
-		flusher, canFlush := w.(http.Flusher)
-
-		pr, pw := io.Pipe()
-		done := make(chan flash.Result, 1)
-		go func() {
-			result := flash.FlashESPHomeDevice(database, builder, modMap, flash.ESPHomeRequest{
-				Ctx:           r.Context(),
-				Port:          req.Port,
-				DeviceName:    req.DeviceName,
-				WiFiSSID:      req.WiFiSSID,
-				WiFiPassword:  req.WiFiPassword,
-				Board:         req.Board,
-				HAIntegration: req.HAIntegration,
-				Components:    req.Components,
-			}, pw)
-			pw.Close()
-			done <- result
-		}()
-
-		lineCh := make(chan string)
-		go func() {
-			scanner := bufio.NewScanner(pr)
-			for scanner.Scan() {
-				lineCh <- scanner.Text()
-			}
-			close(lineCh)
-		}()
-		ticker := time.NewTicker(20 * time.Second)
-		defer ticker.Stop()
-	scanLoop:
-		for {
-			select {
-			case line, ok := <-lineCh:
-				if !ok {
-					break scanLoop
-				}
-				if s := strings.TrimSpace(line); s != "" {
-					json.NewEncoder(w).Encode(map[string]string{"log": s}) //nolint:errcheck
-					if canFlush {
-						flusher.Flush()
-					}
-				}
-				ticker.Reset(20 * time.Second)
-			case <-ticker.C:
-				json.NewEncoder(w).Encode(map[string]string{"log": "…"}) //nolint:errcheck
-				if canFlush {
-					flusher.Flush()
-				}
-			}
-		}
-
-		result := <-done
-		if result.Error != nil {
-			json.NewEncoder(w).Encode(map[string]interface{}{"ok": false, "error": result.Error.Error()}) //nolint:errcheck
-		} else {
-			json.NewEncoder(w).Encode(map[string]interface{}{"ok": true, "device_id": result.DeviceID, "name": result.Name}) //nolint:errcheck
-		}
-		if canFlush {
-			flusher.Flush()
-		}
+		http.Error(w, "ESPHome flash via queue not yet implemented — use /api/jobs", http.StatusNotImplemented)
 	}
 }

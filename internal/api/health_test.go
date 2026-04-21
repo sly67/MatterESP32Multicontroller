@@ -25,7 +25,7 @@ func newTestServer(t *testing.T) http.Handler {
 	})
 	testDBs[t] = database
 	cfg := &config.Config{WebPort: 48060, OTAPort: 48061}
-	return api.NewRouter(cfg, database)
+	return api.NewRouter(cfg, database, nil)
 }
 
 func newTestServerWithDataDir(t *testing.T, dataDir string) http.Handler {
@@ -38,7 +38,7 @@ func newTestServerWithDataDir(t *testing.T, dataDir string) http.Handler {
 	})
 	testDBs[t] = database
 	cfg := &config.Config{WebPort: 48060, OTAPort: 48061, DataDir: dataDir}
-	return api.NewRouter(cfg, database)
+	return api.NewRouter(cfg, database, nil)
 }
 
 func getDatabase(t *testing.T, _ http.Handler) *db.Database {
