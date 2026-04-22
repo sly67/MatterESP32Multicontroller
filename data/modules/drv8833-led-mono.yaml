@@ -234,6 +234,55 @@ esphome:
                 ledc_set_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t){LEDC_CHAN_B}, duty_of(cur_b));
                 ledc_update_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t){LEDC_CHAN_B});
           - lambda:
+              name: Dual Flame
+              update_interval: 50ms
+              lambda: |-
+                const int   SIDE_PARAM = {SIDE};
+                const float F_MIN      = {MIN_PCT};
+                const float F_MAX      = {MAX_PCT};
+                const float F_RANGE    = F_MAX - F_MIN;
+                const float SPD        = {SPEED};
+                const float FLARE_PROB = ({FLARE_RATE_HZ}) * 0.05f;
+                const float WIND       = {WIND};
+                auto fr  = []() -> float { return (rand() % 1000) * 0.001f; };
+                auto frc = []() -> float { return (rand() % 1000) * 0.001f - 0.5f; };
+                auto clp = [](float v, float lo, float hi) -> float {
+                  return v < lo ? lo : (v > hi ? hi : v);
+                };
+                auto duty_of = [](float b) -> uint32_t {
+                  if (b < 0.0f) b = 0.0f; if (b > 1.0f) b = 1.0f;
+                  uint32_t d = (uint32_t)(powf(b, 2.2f) * 2048.0f);
+                  return d > 2048u ? 2048u : d;
+                };
+                static float base_a  = {MIN_PCT};
+                static float base_b  = {MIN_PCT};
+                static float flare_a = 0.0f;
+                static float flare_b = 0.0f;
+                const float center = F_MIN + F_RANGE * 0.4f;
+                base_a += frc() * 0.06f * SPD;
+                base_a += (center - base_a) * 0.05f;
+                base_a = clp(base_a, F_MIN, F_MAX);
+                base_b += frc() * 0.06f * SPD;
+                base_b += (center - base_b) * 0.05f;
+                base_b = clp(base_b, F_MIN, F_MAX);
+                if (fr() < FLARE_PROB) flare_a = fr() * F_RANGE * 0.6f;
+                if (fr() < FLARE_PROB) flare_b = fr() * F_RANGE * 0.6f;
+                flare_a *= 0.7f;
+                flare_b *= 0.7f;
+                float brt_a = clp(base_a + flare_a, F_MIN, F_MAX);
+                float brt_b = clp(base_b + flare_b, F_MIN, F_MAX);
+                brt_a = clp(brt_a * (1.0f - WIND * 0.5f), F_MIN, F_MAX);
+                brt_b = clp(brt_b * (1.0f + WIND * 0.5f), F_MIN, F_MAX);
+                uint32_t da, db;
+                if      (SIDE_PARAM == 0) { da = duty_of(brt_a); db = duty_of(F_MIN); }
+                else if (SIDE_PARAM == 1) { da = duty_of(F_MIN);  db = duty_of(brt_b); }
+                else if (SIDE_PARAM == 3) { da = duty_of(brt_a);  db = duty_of(clp(F_MAX - (brt_a - F_MIN), F_MIN, F_MAX)); }
+                else                      { da = duty_of(brt_a);  db = duty_of(brt_b); }
+                ledc_set_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t){LEDC_CHAN_A}, da);
+                ledc_update_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t){LEDC_CHAN_A});
+                ledc_set_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t){LEDC_CHAN_B}, db);
+                ledc_update_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t){LEDC_CHAN_B});
+          - lambda:
               name: Twinkle
               update_interval: 50ms
               lambda: |-
