@@ -326,3 +326,69 @@ esphome:
                 }
                 if (total > 1.0f) total = 1.0f;
                 id({ID}_mono_out).set_level(total);
+          - lambda:
+              name: Dual Twinkle
+              update_interval: 50ms
+              lambda: |-
+                const int   SIDE_PARAM = {SIDE};
+                const float T_MIN      = {MIN_PCT};
+                const float T_MAX      = {MAX_PCT};
+                const float SPD        = {SPEED};
+                const int   DENS       = {DENSITY};
+                const uint8_t FI = (uint8_t)(4.0f/SPD  < 1.0f ? 1 : (int)(4.0f/SPD));
+                const uint8_t HO = (uint8_t)(2.0f/SPD  < 1.0f ? 1 : (int)(2.0f/SPD));
+                const uint8_t FO = (uint8_t)(18.0f/SPD < 1.0f ? 1 : (int)(18.0f/SPD));
+                const int MAX_WAIT = (int)(28.0f/SPD) + 1;
+                struct Spark { uint8_t state, step, wait; float peak; };
+                static Spark sa[6] = {}, sb[6] = {};
+                static bool inited = false;
+                if (!inited) {
+                  inited = true;
+                  for (int i = 0; i < 6; i++) {
+                    sa[i].wait = (uint8_t)(3 + i * 7);
+                    sb[i].wait = (uint8_t)(5 + i * 8);
+                  }
+                }
+                auto run = [&](Spark* sp, int n) -> float {
+                  float tot = T_MIN;
+                  for (int i = 0; i < n && i < 6; i++) {
+                    float b = 0.0f;
+                    Spark& s = sp[i];
+                    switch (s.state) {
+                      case 0:
+                        if (++s.step >= s.wait) {
+                          s.state = 1; s.step = 0;
+                          s.peak = T_MIN + (T_MAX - T_MIN) * (0.3f + (rand()%700)*0.001f);
+                          s.wait = (uint8_t)(5 + rand() % (MAX_WAIT > 1 ? MAX_WAIT : 2));
+                        }
+                        break;
+                      case 1:
+                        b = s.peak * s.step / (float)FI;
+                        if (++s.step > FI) { s.state = 2; s.step = 0; }
+                        break;
+                      case 2:
+                        b = s.peak;
+                        if (++s.step > HO) { s.state = 3; s.step = 0; }
+                        break;
+                      case 3:
+                        b = s.peak * (1.0f - s.step / (float)FO);
+                        if (++s.step > FO) { s.state = 0; s.step = 0; }
+                        break;
+                    }
+                    tot += b;
+                  }
+                  return tot > T_MAX ? T_MAX : tot;
+                };
+                auto duty_of = [](float b) -> uint32_t {
+                  if (b < 0.0f) b = 0.0f; if (b > 1.0f) b = 1.0f;
+                  uint32_t d = (uint32_t)(powf(b, 2.2f) * 2048.0f);
+                  return d > 2048u ? 2048u : d;
+                };
+                float brt_a = T_MIN, brt_b = T_MIN;
+                if      (SIDE_PARAM == 0) { brt_a = run(sa, DENS); }
+                else if (SIDE_PARAM == 1) { brt_b = run(sb, DENS); }
+                else                      { brt_a = run(sa, DENS); brt_b = run(sb, DENS); }
+                ledc_set_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t){LEDC_CHAN_A}, duty_of(brt_a));
+                ledc_update_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t){LEDC_CHAN_A});
+                ledc_set_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t){LEDC_CHAN_B}, duty_of(brt_b));
+                ledc_update_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t){LEDC_CHAN_B});
