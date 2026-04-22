@@ -29,16 +29,21 @@ func TestLoadModules_ReturnsAll(t *testing.T) {
 	assert.True(t, ids["binary-input"])
 }
 
-func TestLoadEffects_ReturnsTwo(t *testing.T) {
+func TestLoadEffects_ReturnsAll(t *testing.T) {
 	effs, err := library.LoadEffects()
 	require.NoError(t, err)
-	assert.Len(t, effs, 2)
+	assert.Len(t, effs, 7)
 	ids := make(map[string]bool)
 	for _, e := range effs {
 		ids[e.ID] = true
 	}
 	assert.True(t, ids["firefly-effect"])
 	assert.True(t, ids["breathing-effect"])
+	assert.True(t, ids["strobe-dual"])
+	assert.True(t, ids["breathing-dual"])
+	assert.True(t, ids["flicker-dual"])
+	assert.True(t, ids["flame-dual"])
+	assert.True(t, ids["twinkle-dual"])
 }
 
 func TestLoadBoards_ReturnsThree(t *testing.T) {

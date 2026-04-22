@@ -76,8 +76,8 @@ func TestJobs_CreateAndGet(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w2.Code)
 	var got map[string]interface{}
 	require.NoError(t, json.NewDecoder(w2.Body).Decode(&got))
-	assert.Equal(t, id, got["ID"])
-	assert.Equal(t, "TestDevice", got["DeviceName"])
+	assert.Equal(t, id, got["id"])
+	assert.Equal(t, "TestDevice", got["device_name"])
 }
 
 func TestJobs_List(t *testing.T) {
