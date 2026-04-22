@@ -126,6 +126,7 @@ func (q *Queue) Cancel(id string) error {
 			q.pending = append(q.pending[:i], q.pending[i+1:]...)
 			q.mu.Unlock()
 			q.database.UpdateJobStatus(id, string(JobCancelled), "", "cancelled") //nolint:errcheck
+			q.broadcast(id, Event{Type: "status", Data: "cancelled"})
 			q.broadcast(id, Event{Type: "done", ErrorMsg: "cancelled"})
 			q.closeSubscribers(id)
 			return nil
@@ -171,6 +172,7 @@ func (q *Queue) Subscribe(id string) (<-chan Event, func(), error) {
 		close(ch)
 		return ch, func() {}, nil
 	case JobCancelled:
+		ch <- Event{Type: "status", Data: "cancelled"}
 		ch <- Event{Type: "done", ErrorMsg: "cancelled"}
 		close(ch)
 		return ch, func() {}, nil
@@ -304,6 +306,39 @@ func (q *Queue) runJob(ctx context.Context, jb *queueJob) {
 	for _, m := range mods {
 		modMap[m.ID] = m
 	}
+
+	// Build effect-param defaults per compatible module type, then fill any
+	// missing params on each component so unset placeholders don't survive
+	// into the generated YAML as literal "{PARAM}" strings.
+	if effs, err2 := library.LoadEffects(); err2 == nil {
+		defaults := make(map[string]map[string]string)
+		for _, e := range effs {
+			for _, compat := range e.CompatibleWith {
+				if defaults[compat] == nil {
+					defaults[compat] = make(map[string]string)
+				}
+				for _, p := range e.Params {
+					if p.Default != nil {
+						defaults[compat][p.ID] = fmt.Sprintf("%v", p.Default)
+					}
+				}
+			}
+		}
+		for i := range cfg.Components {
+			comp := &cfg.Components[i]
+			if d, ok := defaults[comp.Type]; ok {
+				if comp.EffectParams == nil {
+					comp.EffectParams = make(map[string]string)
+				}
+				for k, v := range d {
+					if _, exists := comp.EffectParams[k]; !exists {
+						comp.EffectParams[k] = v
+					}
+				}
+			}
+		}
+	}
+
 	yamlStr, err := Assemble(Config{
 		Board:         cfg.Board,
 		DeviceName:    cfg.DeviceName,
@@ -344,6 +379,7 @@ func (q *Queue) runJob(ctx context.Context, jb *queueJob) {
 	if err := q.sidecar.Compile(ctx, devSlug, logWriter); err != nil {
 		if ctx.Err() != nil {
 			q.database.UpdateJobStatus(jb.id, string(JobCancelled), "", "cancelled") //nolint:errcheck
+			q.broadcast(jb.id, Event{Type: "status", Data: "cancelled"})
 			q.broadcast(jb.id, Event{Type: "done", ErrorMsg: "cancelled"})
 			q.closeSubscribers(jb.id)
 			return
