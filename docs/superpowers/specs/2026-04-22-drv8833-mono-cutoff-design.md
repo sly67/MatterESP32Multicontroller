@@ -130,9 +130,81 @@ Omitting any of the three params uses the default (gamma 2.2, cutoff disabled, b
 
 ---
 
+## UI Changes
+
+### New io types in `internal/yamldef/types.go`
+
+Two new io type constants (alongside existing `IOTypeConfig`):
+
+```go
+IOTypeFloat  = "float"   // number input with step/min/max hints
+IOTypeSelect = "select"  // dropdown with labeled options list
+```
+
+### Extended `IOPin` struct in `internal/yamldef/types.go`
+
+Add optional fields (used as UI hints only — assembler ignores them):
+
+```go
+type IOPin struct {
+    ID      string     `yaml:"id"              json:"id"`
+    Type    string     `yaml:"type"            json:"type"`
+    Label   string     `yaml:"label"           json:"label"`
+    Default string     `yaml:"default,omitempty" json:"default,omitempty"`
+    Step    float64    `yaml:"step,omitempty"  json:"step,omitempty"`
+    Min     *float64   `yaml:"min,omitempty"   json:"min,omitempty"`
+    Max     *float64   `yaml:"max,omitempty"   json:"max,omitempty"`
+    Options []IOOption `yaml:"options,omitempty" json:"options,omitempty"`
+    Constraints Constraints `yaml:"constraints,omitempty" json:"constraints,omitempty"`
+}
+
+type IOOption struct {
+    Value string `yaml:"value" json:"value"`
+    Label string `yaml:"label" json:"label"`
+}
+```
+
+### Validator in `internal/yamldef/module.go`
+
+Add `IOTypeFloat` and `IOTypeSelect` to `validIOTypes`.
+
+### Flash.svelte — both wizards (browser flash step 2 + server flash step 2)
+
+The pin rendering block currently has two branches (`config` → text input, else → GPIO dropdown). Replace with four branches:
+
+```svelte
+<span class="w-24 font-mono truncate">{pinDef?.label ?? role}</span>
+{#if pinDef?.type === 'config'}
+  <input class="input input-bordered input-xs flex-1" type="text"
+    placeholder="value" bind:value={comp.pins[role]} />
+{:else if pinDef?.type === 'float'}
+  <input class="input input-bordered input-xs flex-1" type="number"
+    step={pinDef.step || 'any'}
+    min={pinDef.min ?? ''}
+    max={pinDef.max ?? ''}
+    bind:value={comp.pins[role]} />
+{:else if pinDef?.type === 'select'}
+  <select class="select select-bordered select-xs flex-1" bind:value={comp.pins[role]}>
+    {#each (pinDef.options || []) as opt}
+      <option value={opt.value}>{opt.label}</option>
+    {/each}
+  </select>
+{:else}
+  <select class="select select-bordered select-xs flex-1" bind:value={comp.pins[role]}>
+    <option value="">Select GPIO…</option>
+    {#each boardGpios(board) as gpio}
+      <option value={gpio}>{gpio}</option>
+    {/each}
+  </select>
+{/if}
+```
+
+Note: the label span now shows `pinDef?.label ?? role` so GAMMA shows "Gamma correction" instead of the raw key. The `boardGpios` call uses the correct board variable (`bfEspBoard` in browser wizard, `espBoard` in server wizard).
+
+---
+
 ## Out of Scope
 
 - Applying these params to other modules.
 - A separate maximum brightness cap.
-- UI for setting these params.
 - Per-effect gamma overrides.
