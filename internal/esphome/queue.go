@@ -339,6 +339,30 @@ func (q *Queue) runJob(ctx context.Context, jb *queueJob) {
 		}
 	}
 
+	// Fill io config/float/select defaults for any missing pins.
+	// Prevents unresolved {KEY} placeholders in generated YAML when caller omits optional pins.
+	for i := range cfg.Components {
+		comp := &cfg.Components[i]
+		mod, ok := modMap[comp.Type]
+		if !ok {
+			continue
+		}
+		for _, pin := range mod.IO {
+			if pin.Default == "" {
+				continue
+			}
+			switch pin.Type {
+			case "config", "float", "select":
+				if comp.Pins == nil {
+					comp.Pins = make(map[string]string)
+				}
+				if _, exists := comp.Pins[pin.ID]; !exists {
+					comp.Pins[pin.ID] = pin.Default
+				}
+			}
+		}
+	}
+
 	yamlStr, err := Assemble(Config{
 		Board:         cfg.Board,
 		DeviceName:    cfg.DeviceName,
