@@ -478,7 +478,7 @@ func fillIODefaults(components []ComponentConfig, modMap map[string]*yamldef.Mod
 				continue
 			}
 			switch pin.Type {
-			case "config", "float", "select":
+			case yamldef.IOTypeConfig, yamldef.IOTypeFloat, yamldef.IOTypeSelect:
 				if comp.Pins == nil {
 					comp.Pins = make(map[string]string)
 				}
