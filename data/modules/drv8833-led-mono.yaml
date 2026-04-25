@@ -95,6 +95,7 @@ esphome:
               ledc_channel_config(&cc);
             }
             float level = state;
+            if (level < 0.0f) level = 0.0f;
             if ({CUTOFF_AFTER_GAMMA} == 0 && level > 0.0f && level < {CUTOFF_PCT}) level = {CUTOFF_PCT};
             float g = powf(level, {GAMMA});
             uint32_t duty = (uint32_t)(g * 2048.0f);
