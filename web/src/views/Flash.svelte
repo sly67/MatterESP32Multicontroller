@@ -672,8 +672,9 @@
                     <input class="input input-bordered input-xs flex-1" type="text"
                       placeholder="value" bind:value={comp.pins[role]} />
                   {:else if pinDef?.type === 'float'}
+                    <!-- on:change keeps pin value as string; bind:value would coerce to JS number breaking YAML substitution -->
                     <input class="input input-bordered input-xs flex-1" type="number"
-                      step={pinDef.step || 'any'}
+                      step={pinDef.step ?? 'any'}
                       min={pinDef.min ?? ''}
                       max={pinDef.max ?? ''}
                       value={comp.pins[role]}
@@ -986,8 +987,9 @@
                     <input class="input input-bordered input-xs flex-1" type="text"
                       placeholder="value" bind:value={comp.pins[role]} />
                   {:else if pinDef?.type === 'float'}
+                    <!-- on:change keeps pin value as string; bind:value would coerce to JS number breaking YAML substitution -->
                     <input class="input input-bordered input-xs flex-1" type="number"
-                      step={pinDef.step || 'any'}
+                      step={pinDef.step ?? 'any'}
                       min={pinDef.min ?? ''}
                       max={pinDef.max ?? ''}
                       value={comp.pins[role]}
