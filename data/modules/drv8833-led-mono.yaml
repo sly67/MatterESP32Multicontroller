@@ -25,6 +25,29 @@ io:
     type: config
     label: "LEDC Channel for AIN2 (0–5)"
     default: "3"
+  - id: GAMMA
+    type: float
+    label: "Gamma correction"
+    default: "2.2"
+    min: 0.5
+    max: 5.0
+    step: 0.1
+  - id: CUTOFF_PCT
+    type: float
+    label: "Min brightness (0 = disabled)"
+    default: "0.0"
+    min: 0.0
+    max: 1.0
+    step: 0.01
+  - id: CUTOFF_AFTER_GAMMA
+    type: select
+    label: "Cutoff mode"
+    default: "0"
+    options:
+      - value: "0"
+        label: "Before gamma (brightness space)"
+      - value: "1"
+        label: "After gamma (duty space)"
 pin_groups:
   # Anti-parallel mono-color LEDs — bipolar drive alternates current direction
   # at high frequency so both physical halves light simultaneously.
@@ -71,9 +94,15 @@ esphome:
               cc.hpoint = 2048;
               ledc_channel_config(&cc);
             }
-            float g = powf(state, 2.2f);
+            float level = state;
+            if ({CUTOFF_AFTER_GAMMA} == 0 && level > 0.0f && level < {CUTOFF_PCT}) level = {CUTOFF_PCT};
+            float g = powf(level, {GAMMA});
             uint32_t duty = (uint32_t)(g * 2048.0f);
             if (duty > 2048) duty = 2048;
+            if ({CUTOFF_AFTER_GAMMA} == 1) {
+              const uint32_t min_d = (uint32_t)({CUTOFF_PCT} * 2048.0f);
+              if (duty > 0 && duty < min_d) duty = min_d;
+            }
             ledc_set_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t){LEDC_CHAN_A}, duty);
             ledc_update_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t){LEDC_CHAN_A});
             ledc_set_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t){LEDC_CHAN_B}, duty);
@@ -97,9 +126,15 @@ esphome:
                 const int     PAUSE_RANGE_T = (({PAUSE_MAX_MS}) - ({PAUSE_MIN_MS})) / 10;
                 const int     SIDE_PARAM    = {SIDE};
                 auto duty_of = [](float b) -> uint32_t {
+                  if ({CUTOFF_AFTER_GAMMA} == 0 && b > 0.0f && b < {CUTOFF_PCT}) b = {CUTOFF_PCT};
                   if (b < 0.0f) b = 0.0f; if (b > 1.0f) b = 1.0f;
-                  uint32_t d = (uint32_t)(powf(b, 2.2f) * 2048.0f);
-                  return d > 2048u ? 2048u : d;
+                  uint32_t d = (uint32_t)(powf(b, {GAMMA}) * 2048.0f);
+                  if (d > 2048u) d = 2048u;
+                  if ({CUTOFF_AFTER_GAMMA} == 1) {
+                    const uint32_t min_d = (uint32_t)({CUTOFF_PCT} * 2048.0f);
+                    if (d > 0 && d < min_d) d = min_d;
+                  }
+                  return d;
                 };
                 const uint32_t MIN_D = duty_of({MIN_PCT});
                 const uint32_t MAX_D = duty_of({MAX_PCT});
@@ -151,9 +186,15 @@ esphome:
                 const float BRT_MAX       = {MAX_PCT};
                 const float BRT_RANGE     = BRT_MAX - BRT_MIN;
                 auto duty_of = [](float b) -> uint32_t {
+                  if ({CUTOFF_AFTER_GAMMA} == 0 && b > 0.0f && b < {CUTOFF_PCT}) b = {CUTOFF_PCT};
                   if (b < 0.0f) b = 0.0f; if (b > 1.0f) b = 1.0f;
-                  uint32_t d = (uint32_t)(powf(b, 2.2f) * 2048.0f);
-                  return d > 2048u ? 2048u : d;
+                  uint32_t d = (uint32_t)(powf(b, {GAMMA}) * 2048.0f);
+                  if (d > 2048u) d = 2048u;
+                  if ({CUTOFF_AFTER_GAMMA} == 1) {
+                    const uint32_t min_d = (uint32_t)({CUTOFF_PCT} * 2048.0f);
+                    if (d > 0 && d < min_d) d = min_d;
+                  }
+                  return d;
                 };
                 auto set_sides = [&](uint32_t da, uint32_t db) {
                   ledc_set_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t){LEDC_CHAN_A}, da);
@@ -208,9 +249,15 @@ esphome:
                 const float    ONE_MINUS_S = 1.0f - SMOOTH;
                 const uint32_t UPD_EVERY   = (uint32_t)(1000.0f / ({SPEED_HZ}) / 10.0f + 0.5f);
                 auto duty_of = [](float b) -> uint32_t {
+                  if ({CUTOFF_AFTER_GAMMA} == 0 && b > 0.0f && b < {CUTOFF_PCT}) b = {CUTOFF_PCT};
                   if (b < 0.0f) b = 0.0f; if (b > 1.0f) b = 1.0f;
-                  uint32_t d = (uint32_t)(powf(b, 2.2f) * 2048.0f);
-                  return d > 2048u ? 2048u : d;
+                  uint32_t d = (uint32_t)(powf(b, {GAMMA}) * 2048.0f);
+                  if (d > 2048u) d = 2048u;
+                  if ({CUTOFF_AFTER_GAMMA} == 1) {
+                    const uint32_t min_d = (uint32_t)({CUTOFF_PCT} * 2048.0f);
+                    if (d > 0 && d < min_d) d = min_d;
+                  }
+                  return d;
                 };
                 static float    cur_a = {MIN_PCT};
                 static float    cur_b = {MIN_PCT};
@@ -250,9 +297,15 @@ esphome:
                   return v < lo ? lo : (v > hi ? hi : v);
                 };
                 auto duty_of = [](float b) -> uint32_t {
+                  if ({CUTOFF_AFTER_GAMMA} == 0 && b > 0.0f && b < {CUTOFF_PCT}) b = {CUTOFF_PCT};
                   if (b < 0.0f) b = 0.0f; if (b > 1.0f) b = 1.0f;
-                  uint32_t d = (uint32_t)(powf(b, 2.2f) * 2048.0f);
-                  return d > 2048u ? 2048u : d;
+                  uint32_t d = (uint32_t)(powf(b, {GAMMA}) * 2048.0f);
+                  if (d > 2048u) d = 2048u;
+                  if ({CUTOFF_AFTER_GAMMA} == 1) {
+                    const uint32_t min_d = (uint32_t)({CUTOFF_PCT} * 2048.0f);
+                    if (d > 0 && d < min_d) d = min_d;
+                  }
+                  return d;
                 };
                 static float base_a  = {MIN_PCT};
                 static float base_b  = {MIN_PCT};
@@ -380,9 +433,15 @@ esphome:
                   return tot > T_MAX ? T_MAX : tot;
                 };
                 auto duty_of = [](float b) -> uint32_t {
+                  if ({CUTOFF_AFTER_GAMMA} == 0 && b > 0.0f && b < {CUTOFF_PCT}) b = {CUTOFF_PCT};
                   if (b < 0.0f) b = 0.0f; if (b > 1.0f) b = 1.0f;
-                  uint32_t d = (uint32_t)(powf(b, 2.2f) * 2048.0f);
-                  return d > 2048u ? 2048u : d;
+                  uint32_t d = (uint32_t)(powf(b, {GAMMA}) * 2048.0f);
+                  if (d > 2048u) d = 2048u;
+                  if ({CUTOFF_AFTER_GAMMA} == 1) {
+                    const uint32_t min_d = (uint32_t)({CUTOFF_PCT} * 2048.0f);
+                    if (d > 0 && d < min_d) d = min_d;
+                  }
+                  return d;
                 };
                 float brt_a = T_MIN, brt_b = T_MIN;
                 if      (SIDE_PARAM == 0) { brt_a = run(sa, DENS); }
