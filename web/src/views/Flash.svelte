@@ -667,10 +667,23 @@
               {#each Object.keys(comp.pins) as role}
                 {@const pinDef = (comp.io || []).find(p => p.id === role)}
                 <label class="text-xs flex items-center gap-2">
-                  <span class="w-24 font-mono">{role}</span>
+                  <span class="w-24 font-mono truncate" title={role}>{pinDef?.label ?? role}</span>
                   {#if pinDef?.type === 'config'}
                     <input class="input input-bordered input-xs flex-1" type="text"
-                      placeholder="integer" bind:value={comp.pins[role]} />
+                      placeholder="value" bind:value={comp.pins[role]} />
+                  {:else if pinDef?.type === 'float'}
+                    <input class="input input-bordered input-xs flex-1" type="number"
+                      step={pinDef.step || 'any'}
+                      min={pinDef.min ?? ''}
+                      max={pinDef.max ?? ''}
+                      value={comp.pins[role]}
+                      on:change={e => comp.pins[role] = e.target.value} />
+                  {:else if pinDef?.type === 'select'}
+                    <select class="select select-bordered select-xs flex-1" bind:value={comp.pins[role]}>
+                      {#each (pinDef.options || []) as opt}
+                        <option value={opt.value}>{opt.label}</option>
+                      {/each}
+                    </select>
                   {:else}
                     <select class="select select-bordered select-xs flex-1" bind:value={comp.pins[role]}>
                       <option value="">Select GPIO…</option>
@@ -968,10 +981,23 @@
               {#each Object.keys(comp.pins) as role}
                 {@const pinDef = (comp.io || []).find(p => p.id === role)}
                 <label class="text-xs flex items-center gap-2">
-                  <span class="w-24 font-mono">{role}</span>
+                  <span class="w-24 font-mono truncate" title={role}>{pinDef?.label ?? role}</span>
                   {#if pinDef?.type === 'config'}
                     <input class="input input-bordered input-xs flex-1" type="text"
-                      placeholder="integer" bind:value={comp.pins[role]} />
+                      placeholder="value" bind:value={comp.pins[role]} />
+                  {:else if pinDef?.type === 'float'}
+                    <input class="input input-bordered input-xs flex-1" type="number"
+                      step={pinDef.step || 'any'}
+                      min={pinDef.min ?? ''}
+                      max={pinDef.max ?? ''}
+                      value={comp.pins[role]}
+                      on:change={e => comp.pins[role] = e.target.value} />
+                  {:else if pinDef?.type === 'select'}
+                    <select class="select select-bordered select-xs flex-1" bind:value={comp.pins[role]}>
+                      {#each (pinDef.options || []) as opt}
+                        <option value={opt.value}>{opt.label}</option>
+                      {/each}
+                    </select>
                   {:else}
                     <select class="select select-bordered select-xs flex-1" bind:value={comp.pins[role]}>
                       <option value="">Select GPIO…</option>
