@@ -232,3 +232,28 @@ matter:
 	assert.Equal(t, "1", mod.IO[1].Options[1].Value)
 	assert.Equal(t, "After gamma", mod.IO[1].Options[1].Label)
 }
+
+func TestParseModule_SelectPinRequiresOptions(t *testing.T) {
+	yaml := []byte(`
+id: test-sel-empty
+name: "Test"
+version: "1.0"
+category: driver
+io:
+  - id: AIN1
+    type: digital_pwm_out
+    label: "Output"
+    constraints:
+      pwm: {frequency_hz: 15000, duty_min: 0.0, duty_max: 1.0, resolution_bits: 12}
+  - id: MODE
+    type: select
+    label: "Mode"
+    default: "0"
+matter:
+  endpoint_type: dimmable_light
+  behaviors: [on_off]
+`)
+	_, err := yamldef.ParseModule(yaml)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "must have at least one option")
+}

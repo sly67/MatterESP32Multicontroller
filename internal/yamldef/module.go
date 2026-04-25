@@ -59,6 +59,9 @@ func validateModule(m *Module) error {
 		if pinIDs[pin.ID] {
 			return fmt.Errorf("module %q: duplicate io pin id %q", m.ID, pin.ID)
 		}
+		if pin.Type == IOTypeSelect && len(pin.Options) == 0 {
+			return fmt.Errorf("module %q: select io pin %q must have at least one option", m.ID, pin.ID)
+		}
 		pinIDs[pin.ID] = true
 	}
 	for _, pg := range m.PinGroups {
