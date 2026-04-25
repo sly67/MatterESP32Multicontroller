@@ -162,3 +162,73 @@ matter:
 	require.NoError(t, err)
 	assert.Equal(t, "config", mod.IO[1].Type)
 }
+
+func TestParseModule_FloatTypePin(t *testing.T) {
+	yaml := []byte(`
+id: test-float
+name: "Test Float"
+version: "1.0"
+category: driver
+io:
+  - id: AIN1
+    type: digital_pwm_out
+    label: "Output"
+    constraints:
+      pwm: {frequency_hz: 15000, duty_min: 0.0, duty_max: 1.0, resolution_bits: 12}
+  - id: GAMMA
+    type: float
+    label: "Gamma correction"
+    default: "2.2"
+    min: 0.5
+    max: 5.0
+    step: 0.1
+matter:
+  endpoint_type: dimmable_light
+  behaviors: [on_off]
+`)
+	mod, err := yamldef.ParseModule(yaml)
+	require.NoError(t, err)
+	assert.Equal(t, "float", mod.IO[1].Type)
+	assert.Equal(t, "2.2", mod.IO[1].Default)
+	assert.Equal(t, 0.1, mod.IO[1].Step)
+	require.NotNil(t, mod.IO[1].Min)
+	assert.Equal(t, 0.5, *mod.IO[1].Min)
+	require.NotNil(t, mod.IO[1].Max)
+	assert.Equal(t, 5.0, *mod.IO[1].Max)
+}
+
+func TestParseModule_SelectTypePin(t *testing.T) {
+	yaml := []byte(`
+id: test-select
+name: "Test Select"
+version: "1.0"
+category: driver
+io:
+  - id: AIN1
+    type: digital_pwm_out
+    label: "Output"
+    constraints:
+      pwm: {frequency_hz: 15000, duty_min: 0.0, duty_max: 1.0, resolution_bits: 12}
+  - id: MODE
+    type: select
+    label: "Cutoff mode"
+    default: "0"
+    options:
+      - value: "0"
+        label: "Before gamma"
+      - value: "1"
+        label: "After gamma"
+matter:
+  endpoint_type: dimmable_light
+  behaviors: [on_off]
+`)
+	mod, err := yamldef.ParseModule(yaml)
+	require.NoError(t, err)
+	assert.Equal(t, "select", mod.IO[1].Type)
+	assert.Equal(t, "0", mod.IO[1].Default)
+	require.Len(t, mod.IO[1].Options, 2)
+	assert.Equal(t, "0", mod.IO[1].Options[0].Value)
+	assert.Equal(t, "Before gamma", mod.IO[1].Options[0].Label)
+	assert.Equal(t, "1", mod.IO[1].Options[1].Value)
+	assert.Equal(t, "After gamma", mod.IO[1].Options[1].Label)
+}

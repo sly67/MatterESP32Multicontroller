@@ -12,6 +12,8 @@ const (
 	IOTypeI2CData       = "i2c_data"
 	IOTypeI2CClock      = "i2c_clock"
 	IOTypeConfig        = "config" // non-GPIO configuration value (e.g. LEDC channel, timer index)
+	IOTypeFloat         = "float"  // numeric float value with optional step/min/max hints
+	IOTypeSelect        = "select" // enumeration with labeled options
 )
 
 // ParamType values for EffectParam.Type.
@@ -51,7 +53,17 @@ type IOPin struct {
 	Type        string      `yaml:"type"         json:"type"`
 	Label       string      `yaml:"label"        json:"label"`
 	Default     string      `yaml:"default,omitempty" json:"default,omitempty"`
+	Step        float64     `yaml:"step,omitempty"   json:"step,omitempty"`
+	Min         *float64    `yaml:"min,omitempty"    json:"min,omitempty"`
+	Max         *float64    `yaml:"max,omitempty"    json:"max,omitempty"`
+	Options     []IOOption  `yaml:"options,omitempty" json:"options,omitempty"`
 	Constraints Constraints `yaml:"constraints,omitempty" json:"constraints,omitempty"`
+}
+
+// IOOption is one choice within a select-type IOPin.
+type IOOption struct {
+	Value string `yaml:"value" json:"value"`
+	Label string `yaml:"label" json:"label"`
 }
 
 // Constraints holds type-specific pin constraints.

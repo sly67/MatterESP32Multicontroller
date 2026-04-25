@@ -19,6 +19,8 @@ var validIOTypes = map[string]bool{
 	IOTypeI2CData:       true,
 	IOTypeI2CClock:      true,
 	IOTypeConfig:        true,
+	IOTypeFloat:         true,
+	IOTypeSelect:        true,
 }
 
 // ParseModule parses and validates a Module from YAML bytes.
