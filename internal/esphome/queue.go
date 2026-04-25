@@ -341,27 +341,7 @@ func (q *Queue) runJob(ctx context.Context, jb *queueJob) {
 
 	// Fill io config/float/select defaults for any missing pins.
 	// Prevents unresolved {KEY} placeholders in generated YAML when caller omits optional pins.
-	for i := range cfg.Components {
-		comp := &cfg.Components[i]
-		mod, ok := modMap[comp.Type]
-		if !ok {
-			continue
-		}
-		for _, pin := range mod.IO {
-			if pin.Default == "" {
-				continue
-			}
-			switch pin.Type {
-			case "config", "float", "select":
-				if comp.Pins == nil {
-					comp.Pins = make(map[string]string)
-				}
-				if _, exists := comp.Pins[pin.ID]; !exists {
-					comp.Pins[pin.ID] = pin.Default
-				}
-			}
-		}
-	}
+	fillIODefaults(cfg.Components, modMap)
 
 	yamlStr, err := Assemble(Config{
 		Board:         cfg.Board,
@@ -483,3 +463,29 @@ func randomHexID(n int) (string, error) {
 
 // Ensure jobLogWriter implements io.Writer (compile-time check).
 var _ io.Writer = (*jobLogWriter)(nil)
+
+// fillIODefaults fills missing config/float/select pins from module IO defaults.
+// This prevents unresolved {KEY} placeholders from surviving into generated YAML.
+func fillIODefaults(components []ComponentConfig, modMap map[string]*yamldef.Module) {
+	for i := range components {
+		comp := &components[i]
+		mod, ok := modMap[comp.Type]
+		if !ok {
+			continue
+		}
+		for _, pin := range mod.IO {
+			if pin.Default == "" {
+				continue
+			}
+			switch pin.Type {
+			case "config", "float", "select":
+				if comp.Pins == nil {
+					comp.Pins = make(map[string]string)
+				}
+				if _, exists := comp.Pins[pin.ID]; !exists {
+					comp.Pins[pin.ID] = pin.Default
+				}
+			}
+		}
+	}
+}
